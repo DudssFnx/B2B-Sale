@@ -760,12 +760,27 @@ export async function registerRoutes(
       }
 
       const { order, items, customer } = orderDetails;
+      
+      // PDF type: separacao, cobranca (default), conferencia
+      const pdfType = (req.query.type as string) || 'cobranca';
+      const showPrices = pdfType === 'cobranca';
+      const showCustomerDetails = pdfType !== 'conferencia';
+      
+      const pdfTitles: Record<string, string> = {
+        separacao: 'SEPARACAO',
+        cobranca: 'ORCAMENTO',
+        conferencia: 'CONFERENCIA'
+      };
 
       // Create PDF document
       const doc = new PDFDocument({ margin: 40, size: 'A4' });
 
+      const fileName = pdfType === 'cobranca' 
+        ? `Orcamento_${order.orderNumber}.pdf`
+        : `${pdfTitles[pdfType] || 'PDF'}_${order.orderNumber}.pdf`;
+      
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="Orcamento_${order.orderNumber}.pdf"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
       doc.pipe(res);
 
@@ -773,77 +788,79 @@ export async function registerRoutes(
       doc.fontSize(16).font('Helvetica-Bold').text('LOJAMADRUGADAO SAO PAULO', { align: 'center' });
       doc.fontSize(12).font('Helvetica').text('11 99284-5596', { align: 'center' });
       doc.moveDown(0.5);
-      doc.fontSize(14).font('Helvetica-Bold').text(`Orcamento N. ${order.orderNumber}`, { align: 'center' });
+      doc.fontSize(14).font('Helvetica-Bold').text(`${pdfTitles[pdfType] || 'ORCAMENTO'} N. ${order.orderNumber}`, { align: 'center' });
       doc.moveDown();
 
-      // Customer Info
-      doc.fontSize(10).font('Helvetica-Bold').text('DADOS DO CLIENTE');
-      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-      doc.moveDown(0.3);
+      // Customer Info (only for separacao and cobranca)
+      if (showCustomerDetails) {
+        doc.fontSize(10).font('Helvetica-Bold').text('DADOS DO CLIENTE');
+        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+        doc.moveDown(0.3);
 
-      doc.font('Helvetica');
-      if (customer) {
-        const col1X = 40;
-        const col2X = 300;
+        doc.font('Helvetica');
+        if (customer) {
+          const col1X = 40;
+          const col2X = 300;
 
-        let y = doc.y;
-        doc.text(`Cliente: ${customer.firstName || ''} ${customer.lastName || ''}`, col1X, y);
-        if (customer.company) {
-          doc.text(`Razao Social: ${customer.company}`, col2X, y);
+          let y = doc.y;
+          doc.text(`Cliente: ${customer.firstName || ''} ${customer.lastName || ''}`, col1X, y);
+          if (customer.company) {
+            doc.text(`Razao Social: ${customer.company}`, col2X, y);
+          }
+
+          y = doc.y + 5;
+          if (customer.tradingName) {
+            doc.text(`Nome Fantasia: ${customer.tradingName}`, col1X, y);
+          }
+          
+          y = doc.y + 5;
+          if (customer.personType === 'juridica' && customer.cnpj) {
+            doc.text(`CNPJ: ${customer.cnpj}`, col1X, y);
+          } else if (customer.cpf) {
+            doc.text(`CPF: ${customer.cpf}`, col1X, y);
+          }
+          if (customer.stateRegistration) {
+            doc.text(`Inscricao Estadual: ${customer.stateRegistration}`, col2X, y);
+          }
+
+          y = doc.y + 5;
+          let addressLine = '';
+          if (customer.address) {
+            addressLine = customer.address;
+            if (customer.addressNumber) addressLine += `, ${customer.addressNumber}`;
+            if (customer.complement) addressLine += ` - ${customer.complement}`;
+          }
+          if (addressLine) {
+            doc.text(`Endereco: ${addressLine}`, col1X, y);
+          }
+
+          y = doc.y + 5;
+          if (customer.neighborhood) {
+            doc.text(`Bairro: ${customer.neighborhood}`, col1X, y);
+          }
+          if (customer.cep) {
+            doc.text(`CEP: ${customer.cep}`, col2X, y);
+          }
+
+          y = doc.y + 5;
+          if (customer.city) {
+            doc.text(`Cidade: ${customer.city}`, col1X, y);
+          }
+          if (customer.state) {
+            doc.text(`Estado: ${customer.state}`, col2X, y);
+          }
+
+          y = doc.y + 5;
+          if (customer.phone) {
+            doc.text(`Telefone: ${customer.phone}`, col1X, y);
+          }
+          if (customer.email) {
+            doc.text(`E-mail: ${customer.email}`, col2X, y);
+          }
         }
 
-        y = doc.y + 5;
-        if (customer.tradingName) {
-          doc.text(`Nome Fantasia: ${customer.tradingName}`, col1X, y);
-        }
-        
-        y = doc.y + 5;
-        if (customer.personType === 'juridica' && customer.cnpj) {
-          doc.text(`CNPJ: ${customer.cnpj}`, col1X, y);
-        } else if (customer.cpf) {
-          doc.text(`CPF: ${customer.cpf}`, col1X, y);
-        }
-        if (customer.stateRegistration) {
-          doc.text(`Inscricao Estadual: ${customer.stateRegistration}`, col2X, y);
-        }
-
-        y = doc.y + 5;
-        let addressLine = '';
-        if (customer.address) {
-          addressLine = customer.address;
-          if (customer.addressNumber) addressLine += `, ${customer.addressNumber}`;
-          if (customer.complement) addressLine += ` - ${customer.complement}`;
-        }
-        if (addressLine) {
-          doc.text(`Endereco: ${addressLine}`, col1X, y);
-        }
-
-        y = doc.y + 5;
-        if (customer.neighborhood) {
-          doc.text(`Bairro: ${customer.neighborhood}`, col1X, y);
-        }
-        if (customer.cep) {
-          doc.text(`CEP: ${customer.cep}`, col2X, y);
-        }
-
-        y = doc.y + 5;
-        if (customer.city) {
-          doc.text(`Cidade: ${customer.city}`, col1X, y);
-        }
-        if (customer.state) {
-          doc.text(`Estado: ${customer.state}`, col2X, y);
-        }
-
-        y = doc.y + 5;
-        if (customer.phone) {
-          doc.text(`Telefone: ${customer.phone}`, col1X, y);
-        }
-        if (customer.email) {
-          doc.text(`E-mail: ${customer.email}`, col2X, y);
-        }
+        doc.moveDown(1.5);
       }
-
-      doc.moveDown(1.5);
 
       // Items Table Header
       doc.font('Helvetica-Bold').fontSize(10);
@@ -855,15 +872,17 @@ export async function registerRoutes(
       const tableTop = doc.y;
       const colCode = 40;
       const colProduct = 100;
-      const colQty = 350;
+      const colQty = showPrices ? 350 : 450;
       const colPrice = 410;
       const colSubtotal = 480;
 
       doc.text('#', colCode, tableTop);
       doc.text('Produto', colProduct, tableTop);
       doc.text('Qtde.', colQty, tableTop);
-      doc.text('Preco', colPrice, tableTop);
-      doc.text('Subtotal', colSubtotal, tableTop);
+      if (showPrices) {
+        doc.text('Preco', colPrice, tableTop);
+        doc.text('Subtotal', colSubtotal, tableTop);
+      }
 
       doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
       doc.moveDown(0.5);
@@ -878,10 +897,12 @@ export async function registerRoutes(
         totalQty += item.quantity;
 
         doc.text(item.product?.sku || '-', colCode, y, { width: 55 });
-        doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, y, { width: 245 });
+        doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, y, { width: showPrices ? 245 : 345 });
         doc.text(item.quantity.toString(), colQty, y);
-        doc.text(`R$ ${parseFloat(item.price).toFixed(2)}`, colPrice, y);
-        doc.text(`R$ ${itemSubtotal.toFixed(2)}`, colSubtotal, y);
+        if (showPrices) {
+          doc.text(`R$ ${parseFloat(item.price).toFixed(2)}`, colPrice, y);
+          doc.text(`R$ ${itemSubtotal.toFixed(2)}`, colSubtotal, y);
+        }
 
         doc.moveDown(0.8);
       }
@@ -889,16 +910,19 @@ export async function registerRoutes(
       doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
       doc.moveDown();
 
-      // Totals
+      // Totals (only for cobranca)
       doc.font('Helvetica-Bold').fontSize(10);
-      const totalsX = 380;
-      doc.text(`Qtde. Total: ${totalQty}`, totalsX, doc.y);
-      doc.moveDown(0.3);
-      doc.text(`Total de Descontos: R$ 0,00`, totalsX);
-      doc.moveDown(0.3);
-      doc.text(`Valor do frete: R$ 0,00`, totalsX);
-      doc.moveDown(0.3);
-      doc.fontSize(12).text(`Valor Total: R$ ${parseFloat(order.total).toFixed(2)}`, totalsX);
+      doc.text(`Qtde. Total: ${totalQty}`, 40, doc.y);
+      
+      if (showPrices) {
+        const totalsX = 380;
+        doc.moveDown(0.3);
+        doc.text(`Total de Descontos: R$ 0,00`, totalsX);
+        doc.moveDown(0.3);
+        doc.text(`Valor do frete: R$ 0,00`, totalsX);
+        doc.moveDown(0.3);
+        doc.fontSize(12).text(`Valor Total: R$ ${parseFloat(order.total).toFixed(2)}`, totalsX);
+      }
 
       doc.moveDown(2);
 

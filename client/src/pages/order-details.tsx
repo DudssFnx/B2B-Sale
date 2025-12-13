@@ -333,46 +333,120 @@ export default function OrderDetailsPage() {
                   <Printer className="h-4 w-4 mr-2" />
                   {printMutation.isPending ? "Imprimindo..." : "Imprimir Pedido"}
                 </Button>
-                <Button
-                  variant="default"
-                  className="w-full"
-                  onClick={async () => {
-                    try {
-                      const response = await fetch(`/api/orders/${orderId}/pdf`, {
-                        credentials: 'include',
-                      });
-                      if (!response.ok) throw new Error('Failed to generate PDF');
-                      const blob = await response.blob();
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `Orcamento_${orderData?.orderNumber || orderId}.pdf`;
-                      document.body.appendChild(a);
-                      a.click();
-                      window.URL.revokeObjectURL(url);
-                      document.body.removeChild(a);
-                      
-                      await apiRequest("PATCH", `/api/orders/${orderId}/print`, {});
-                      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId] });
-                      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
-                      
-                      toast({
-                        title: "PDF Gerado",
-                        description: "O PDF foi gerado e o pedido foi marcado como impresso.",
-                      });
-                    } catch (error) {
-                      toast({
-                        title: "Erro",
-                        description: "Não foi possível gerar o PDF.",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                  data-testid="button-download-pdf"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Gerar PDF
-                </Button>
+                <div className="grid grid-cols-1 gap-2">
+                  <Button
+                    variant="default"
+                    className="w-full"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/orders/${orderId}/pdf?type=cobranca`, {
+                          credentials: 'include',
+                        });
+                        if (!response.ok) throw new Error('Failed to generate PDF');
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `Orcamento_${orderData?.orderNumber || orderId}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        await apiRequest("PATCH", `/api/orders/${orderId}/print`, {});
+                        queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId] });
+                        queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+                        
+                        toast({
+                          title: "PDF Gerado",
+                          description: "PDF de Cobranca gerado com sucesso.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Erro",
+                          description: "Nao foi possivel gerar o PDF.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    data-testid="button-pdf-cobranca"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    PDF Cobranca
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/orders/${orderId}/pdf?type=separacao`, {
+                          credentials: 'include',
+                        });
+                        if (!response.ok) throw new Error('Failed to generate PDF');
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `Separacao_${orderData?.orderNumber || orderId}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        toast({
+                          title: "PDF Gerado",
+                          description: "PDF de Separacao gerado com sucesso.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Erro",
+                          description: "Nao foi possivel gerar o PDF.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    data-testid="button-pdf-separacao"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    PDF Separacao
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/orders/${orderId}/pdf?type=conferencia`, {
+                          credentials: 'include',
+                        });
+                        if (!response.ok) throw new Error('Failed to generate PDF');
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `Conferencia_${orderData?.orderNumber || orderId}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        toast({
+                          title: "PDF Gerado",
+                          description: "PDF de Conferencia gerado com sucesso.",
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Erro",
+                          description: "Nao foi possivel gerar o PDF.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    data-testid="button-pdf-conferencia"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    PDF Conferencia
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}
