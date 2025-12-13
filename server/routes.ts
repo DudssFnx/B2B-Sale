@@ -179,8 +179,15 @@ export async function registerRoutes(
         return res.status(401).json({ message: "E-mail ou senha incorretos" });
       }
 
-      // Create session for local user
-      req.login({ claims: { sub: user.id } }, (err: any) => {
+      // Create session for local user with expires_at for compatibility with isAuthenticated
+      const sessionExpiry = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60); // 1 week
+      const sessionUser = {
+        claims: { sub: user.id },
+        expires_at: sessionExpiry,
+        isLocalAuth: true,
+      };
+      
+      req.login(sessionUser, (err: any) => {
         if (err) {
           console.error("Login error:", err);
           return res.status(500).json({ message: "Erro ao fazer login" });
