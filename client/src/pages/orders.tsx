@@ -5,14 +5,32 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, RefreshCw, Loader2, Package, Eye } from "lucide-react";
+import { Download, RefreshCw, Loader2, Package, Eye, Plus, Trash2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Order as SchemaOrder } from "@shared/schema";
+import type { Order as SchemaOrder, Product, User } from "@shared/schema";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "wouter";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface OrderWithItems extends SchemaOrder {
   items?: { id: number; quantity: number }[];
@@ -32,16 +50,105 @@ function getCustomerStatusVariant(status: string): "default" | "secondary" | "de
   return "secondary";
 }
 
+interface CartItem {
+  productId: number;
+  product: Product;
+  quantity: number;
+}
+
 export default function OrdersPage() {
   const { isAdmin, isSales } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("all");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [productSearch, setProductSearch] = useState("");
 
   const showAllOrders = isAdmin || isSales;
 
   const { data: ordersData = [], isLoading, refetch } = useQuery<OrderWithItems[]>({
     queryKey: ['/api/orders'],
   });
+
+  const { data: customersData = [] } = useQuery<User[]>({
+    queryKey: ['/api/users'],
+    enabled: showAllOrders,
+  });
+
+  const { data: productsResponse } = useQuery<{ products: Product[]; total: number }>({
+    queryKey: ['/api/products'],
+    enabled: showAllOrders,
+  });
+
+  const productsData = productsResponse?.products || [];
+  const approvedCustomers = customersData.filter(u => u.approved && u.role === "customer");
+  const filteredProducts = productsData.filter(p => 
+    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+    p.sku.toLowerCase().includes(productSearch.toLowerCase())
+  ).slice(0, 10);
+
+  const createOrderMutation = useMutation({
+    mutationFn: async (data: { userId: string; items: { productId: number; quantity: number }[] }) => {
+      await apiRequest("POST", "/api/orders", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      setIsCreateOpen(false);
+      setSelectedCustomerId("");
+      setCartItems([]);
+      setProductSearch("");
+      toast({ title: "Sucesso", description: "Pedido criado com sucesso" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro", description: err.message || "Falha ao criar pedido", variant: "destructive" });
+    },
+  });
+
+  const handleAddProduct = (product: Product) => {
+    const existing = cartItems.find(item => item.productId === product.id);
+    if (existing) {
+      setCartItems(cartItems.map(item => 
+        item.productId === product.id 
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      ));
+    } else {
+      setCartItems([...cartItems, { productId: product.id, product, quantity: 1 }]);
+    }
+    setProductSearch("");
+  };
+
+  const handleUpdateQuantity = (productId: number, quantity: number) => {
+    if (quantity <= 0) {
+      setCartItems(cartItems.filter(item => item.productId !== productId));
+    } else {
+      setCartItems(cartItems.map(item => 
+        item.productId === productId ? { ...item, quantity } : item
+      ));
+    }
+  };
+
+  const handleRemoveItem = (productId: number) => {
+    setCartItems(cartItems.filter(item => item.productId !== productId));
+  };
+
+  const handleCreateOrder = () => {
+    if (!selectedCustomerId) {
+      toast({ title: "Erro", description: "Selecione um cliente", variant: "destructive" });
+      return;
+    }
+    if (cartItems.length === 0) {
+      toast({ title: "Erro", description: "Adicione pelo menos um produto", variant: "destructive" });
+      return;
+    }
+    createOrderMutation.mutate({
+      userId: selectedCustomerId,
+      items: cartItems.map(item => ({ productId: item.productId, quantity: item.quantity })),
+    });
+  };
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + (parseFloat(item.product.price) * item.quantity), 0);
 
   const orders: Order[] = ordersData.map((order) => ({
     id: String(order.id),
@@ -202,6 +309,136 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="button-create-order">
+                <Plus className="h-4 w-4 mr-2" />
+                Criar Pedido
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Criar Novo Pedido</DialogTitle>
+                <DialogDescription>
+                  Selecione o cliente e adicione os produtos
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-auto space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Cliente *</Label>
+                  <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
+                    <SelectTrigger data-testid="select-customer">
+                      <SelectValue placeholder="Selecione um cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {approvedCustomers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.firstName} {customer.lastName} - {customer.company || customer.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Adicionar Produtos</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar produto por nome ou SKU..."
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-search-product"
+                    />
+                  </div>
+                  {productSearch && filteredProducts.length > 0 && (
+                    <div className="border rounded-md max-h-40 overflow-y-auto">
+                      {filteredProducts.map((product) => (
+                        <div 
+                          key={product.id}
+                          className="p-2 hover-elevate cursor-pointer flex items-center justify-between gap-2"
+                          onClick={() => handleAddProduct(product)}
+                          data-testid={`product-option-${product.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{product.name}</p>
+                            <p className="text-xs text-muted-foreground">SKU: {product.sku}</p>
+                          </div>
+                          <span className="text-sm font-semibold">R$ {parseFloat(product.price).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {cartItems.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Itens do Pedido ({cartItems.length})</Label>
+                    <ScrollArea className="h-48 border rounded-md">
+                      <div className="p-2 space-y-2">
+                        {cartItems.map((item) => (
+                          <div 
+                            key={item.productId}
+                            className="flex items-center justify-between gap-2 p-2 bg-muted/50 rounded-md"
+                            data-testid={`cart-item-${item.productId}`}
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{item.product.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                R$ {parseFloat(item.product.price).toFixed(2)} un.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={item.quantity}
+                                onChange={(e) => handleUpdateQuantity(item.productId, parseInt(e.target.value) || 0)}
+                                className="w-16 text-center"
+                                data-testid={`input-qty-${item.productId}`}
+                              />
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRemoveItem(item.productId)}
+                                data-testid={`button-remove-${item.productId}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between p-3 bg-muted rounded-md">
+                  <span className="font-semibold">Total:</span>
+                  <span className="text-lg font-bold" data-testid="text-cart-total">
+                    R$ {cartTotal.toFixed(2)}
+                  </span>
+                </div>
+
+                <Button 
+                  className="w-full" 
+                  onClick={handleCreateOrder}
+                  disabled={createOrderMutation.isPending || !selectedCustomerId || cartItems.length === 0}
+                  data-testid="button-submit-order"
+                >
+                  {createOrderMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    "Criar Pedido"
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-orders">
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
