@@ -59,7 +59,6 @@ const statusLabels: Record<string, string> = {
   ORCAMENTO_ABERTO: "Orçamento Aberto",
   ORCAMENTO_CONCLUIDO: "Orçamento Enviado",
   PEDIDO_GERADO: "Pedido Gerado",
-  PEDIDO_IMPRESSO: "Pedido Impresso",
   PEDIDO_FATURADO: "Faturado",
   PEDIDO_CANCELADO: "Cancelado",
   pending: "Pendente",
@@ -73,7 +72,6 @@ const statusVariants: Record<string, "default" | "secondary" | "destructive" | "
   ORCAMENTO_ABERTO: "secondary",
   ORCAMENTO_CONCLUIDO: "outline",
   PEDIDO_GERADO: "default",
-  PEDIDO_IMPRESSO: "default",
   PEDIDO_FATURADO: "default",
   PEDIDO_CANCELADO: "destructive",
   pending: "secondary",
@@ -321,7 +319,6 @@ export default function OrderDetailsPage() {
                     <SelectItem value="ORCAMENTO_ABERTO">Orçamento Aberto</SelectItem>
                     <SelectItem value="ORCAMENTO_CONCLUIDO">Orçamento Enviado</SelectItem>
                     <SelectItem value="PEDIDO_GERADO">Pedido Gerado</SelectItem>
-                    <SelectItem value="PEDIDO_IMPRESSO">Pedido Impresso</SelectItem>
                     <SelectItem value="PEDIDO_FATURADO">Faturado</SelectItem>
                     <SelectItem value="PEDIDO_CANCELADO">Cancelado</SelectItem>
                   </SelectContent>

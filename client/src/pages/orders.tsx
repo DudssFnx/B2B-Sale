@@ -37,7 +37,7 @@ interface OrderWithItems extends SchemaOrder {
 }
 
 function getCustomerStatusLabel(status: string): string {
-  const inProgress = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "PEDIDO_IMPRESSO", "pending", "approved", "processing"];
+  const inProgress = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "pending", "approved", "processing"];
   if (inProgress.includes(status)) return "Em andamento";
   if (status === "PEDIDO_FATURADO" || status === "completed") return "Faturado";
   if (status === "PEDIDO_CANCELADO" || status === "cancelled") return "Cancelado";
@@ -160,7 +160,7 @@ export default function OrdersPage() {
     itemCount: order.items?.length || 0,
   }));
 
-  const newStatuses = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "PEDIDO_IMPRESSO", "PEDIDO_FATURADO", "PEDIDO_CANCELADO"];
+  const newStatuses = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "PEDIDO_FATURADO", "PEDIDO_CANCELADO"];
   
   const filteredOrders = orders.filter((order) => {
     if (activeTab === "all") return true;
@@ -461,9 +461,6 @@ export default function OrdersPage() {
           </TabsTrigger>
           <TabsTrigger value="PEDIDO_GERADO" data-testid="tab-pedido-gerado">
             Pedidos ({orders.filter(o => o.status === "PEDIDO_GERADO").length})
-          </TabsTrigger>
-          <TabsTrigger value="PEDIDO_IMPRESSO" data-testid="tab-pedido-impresso">
-            Impressos ({orders.filter(o => o.status === "PEDIDO_IMPRESSO").length})
           </TabsTrigger>
           <TabsTrigger value="PEDIDO_FATURADO" data-testid="tab-pedido-faturado">
             Faturados ({orders.filter(o => o.status === "PEDIDO_FATURADO").length})

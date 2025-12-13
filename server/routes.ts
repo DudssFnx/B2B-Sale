@@ -381,7 +381,6 @@ export async function registerRoutes(
         printed: true,
         printedAt: new Date(),
         printedBy: userId,
-        status: "PEDIDO_IMPRESSO",
       });
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
