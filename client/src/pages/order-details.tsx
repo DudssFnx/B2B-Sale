@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Package, User, Calendar, FileText, DollarSign, Printer, MapPin } from "lucide-react";
+import { ArrowLeft, Loader2, Package, User, Calendar, FileText, DollarSign, Printer, MapPin, Download } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Order, OrderItem } from "@shared/schema";
@@ -26,6 +26,8 @@ interface CustomerInfo {
   firstName: string | null;
   lastName: string | null;
   company: string | null;
+  tradingName: string | null;
+  stateRegistration: string | null;
   email: string | null;
   phone: string | null;
   personType: string | null;
@@ -322,6 +324,37 @@ export default function OrderDetailsPage() {
                 >
                   <Printer className="h-4 w-4 mr-2" />
                   {printMutation.isPending ? "Imprimindo..." : "Imprimir Pedido"}
+                </Button>
+                <Button
+                  variant="default"
+                  className="w-full"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch(`/api/orders/${orderId}/pdf`, {
+                        credentials: 'include',
+                      });
+                      if (!response.ok) throw new Error('Failed to generate PDF');
+                      const blob = await response.blob();
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `Orcamento_${orderData?.orderNumber || orderId}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                    } catch (error) {
+                      toast({
+                        title: "Erro",
+                        description: "Não foi possível gerar o PDF.",
+                        variant: "destructive",
+                      });
+                    }
+                  }}
+                  data-testid="button-download-pdf"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Gerar PDF
                 </Button>
               </CardContent>
             </Card>

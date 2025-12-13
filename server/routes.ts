@@ -8,6 +8,7 @@ import multer from "multer";
 import { Client } from "@replit/object-storage";
 import * as blingService from "./services/bling";
 import bcrypt from "bcryptjs";
+import PDFDocument from "pdfkit";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -115,6 +116,8 @@ export async function registerRoutes(
         personType: data.personType || null,
         cnpj: data.cnpj || null,
         cpf: data.cpf || null,
+        tradingName: data.tradingName || null,
+        stateRegistration: data.stateRegistration || null,
         cep: data.cep || null,
         address: data.address || null,
         addressNumber: data.addressNumber || null,
@@ -734,6 +737,184 @@ export async function registerRoutes(
     } catch (error: any) {
       console.error("Bling sync products error:", error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== PDF GENERATION ==========
+  app.get('/api/orders/:id/pdf', isAuthenticated, isApproved, async (req: any, res) => {
+    try {
+      const orderDetails = await storage.getOrderWithDetails(parseInt(req.params.id));
+      if (!orderDetails) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      // Customers can only see their own orders
+      if (user?.role === 'customer' && orderDetails.order.userId !== userId) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+
+      const { order, items, customer } = orderDetails;
+
+      // Create PDF document
+      const doc = new PDFDocument({ margin: 40, size: 'A4' });
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="Orcamento_${order.orderNumber}.pdf"`);
+
+      doc.pipe(res);
+
+      // Header
+      doc.fontSize(16).font('Helvetica-Bold').text('LOJAMADRUGADAO SAO PAULO', { align: 'center' });
+      doc.fontSize(12).font('Helvetica').text('11 99284-5596', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.fontSize(14).font('Helvetica-Bold').text(`Orcamento N. ${order.orderNumber}`, { align: 'center' });
+      doc.moveDown();
+
+      // Customer Info
+      doc.fontSize(10).font('Helvetica-Bold').text('DADOS DO CLIENTE');
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+      doc.moveDown(0.3);
+
+      doc.font('Helvetica');
+      if (customer) {
+        const col1X = 40;
+        const col2X = 300;
+
+        let y = doc.y;
+        doc.text(`Cliente: ${customer.firstName || ''} ${customer.lastName || ''}`, col1X, y);
+        if (customer.company) {
+          doc.text(`Razao Social: ${customer.company}`, col2X, y);
+        }
+
+        y = doc.y + 5;
+        if (customer.tradingName) {
+          doc.text(`Nome Fantasia: ${customer.tradingName}`, col1X, y);
+        }
+        
+        y = doc.y + 5;
+        if (customer.personType === 'juridica' && customer.cnpj) {
+          doc.text(`CNPJ: ${customer.cnpj}`, col1X, y);
+        } else if (customer.cpf) {
+          doc.text(`CPF: ${customer.cpf}`, col1X, y);
+        }
+        if (customer.stateRegistration) {
+          doc.text(`Inscricao Estadual: ${customer.stateRegistration}`, col2X, y);
+        }
+
+        y = doc.y + 5;
+        let addressLine = '';
+        if (customer.address) {
+          addressLine = customer.address;
+          if (customer.addressNumber) addressLine += `, ${customer.addressNumber}`;
+          if (customer.complement) addressLine += ` - ${customer.complement}`;
+        }
+        if (addressLine) {
+          doc.text(`Endereco: ${addressLine}`, col1X, y);
+        }
+
+        y = doc.y + 5;
+        if (customer.neighborhood) {
+          doc.text(`Bairro: ${customer.neighborhood}`, col1X, y);
+        }
+        if (customer.cep) {
+          doc.text(`CEP: ${customer.cep}`, col2X, y);
+        }
+
+        y = doc.y + 5;
+        if (customer.city) {
+          doc.text(`Cidade: ${customer.city}`, col1X, y);
+        }
+        if (customer.state) {
+          doc.text(`Estado: ${customer.state}`, col2X, y);
+        }
+
+        y = doc.y + 5;
+        if (customer.phone) {
+          doc.text(`Telefone: ${customer.phone}`, col1X, y);
+        }
+        if (customer.email) {
+          doc.text(`E-mail: ${customer.email}`, col2X, y);
+        }
+      }
+
+      doc.moveDown(1.5);
+
+      // Items Table Header
+      doc.font('Helvetica-Bold').fontSize(10);
+      doc.text('ITENS DO PEDIDO');
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+      doc.moveDown(0.3);
+
+      // Table header
+      const tableTop = doc.y;
+      const colCode = 40;
+      const colProduct = 100;
+      const colQty = 350;
+      const colPrice = 410;
+      const colSubtotal = 480;
+
+      doc.text('#', colCode, tableTop);
+      doc.text('Produto', colProduct, tableTop);
+      doc.text('Qtde.', colQty, tableTop);
+      doc.text('Preco', colPrice, tableTop);
+      doc.text('Subtotal', colSubtotal, tableTop);
+
+      doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
+      doc.moveDown(0.5);
+
+      // Items
+      doc.font('Helvetica').fontSize(9);
+      let totalQty = 0;
+
+      for (const item of items) {
+        const y = doc.y;
+        const itemSubtotal = parseFloat(item.price) * item.quantity;
+        totalQty += item.quantity;
+
+        doc.text(item.product?.sku || '-', colCode, y, { width: 55 });
+        doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, y, { width: 245 });
+        doc.text(item.quantity.toString(), colQty, y);
+        doc.text(`R$ ${parseFloat(item.price).toFixed(2)}`, colPrice, y);
+        doc.text(`R$ ${itemSubtotal.toFixed(2)}`, colSubtotal, y);
+
+        doc.moveDown(0.8);
+      }
+
+      doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+      doc.moveDown();
+
+      // Totals
+      doc.font('Helvetica-Bold').fontSize(10);
+      const totalsX = 380;
+      doc.text(`Qtde. Total: ${totalQty}`, totalsX, doc.y);
+      doc.moveDown(0.3);
+      doc.text(`Total de Descontos: R$ 0,00`, totalsX);
+      doc.moveDown(0.3);
+      doc.text(`Valor do frete: R$ 0,00`, totalsX);
+      doc.moveDown(0.3);
+      doc.fontSize(12).text(`Valor Total: R$ ${parseFloat(order.total).toFixed(2)}`, totalsX);
+
+      doc.moveDown(2);
+
+      // Footer
+      doc.fontSize(9).font('Helvetica');
+      const footerY = doc.y;
+      doc.text(`Data de Emissao: ${new Date(order.createdAt).toLocaleDateString('pt-BR')}`, 40, footerY);
+      doc.text(`Status: ${order.status}`, 300, footerY);
+
+      if (order.notes) {
+        doc.moveDown();
+        doc.font('Helvetica-Bold').text('Observacoes:');
+        doc.font('Helvetica').text(order.notes);
+      }
+
+      doc.end();
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ message: "Failed to generate PDF" });
     }
   });
 

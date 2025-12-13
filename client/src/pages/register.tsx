@@ -164,6 +164,8 @@ const step2Schema = z.object({
   city: z.string().min(2, "Cidade obrigatória"),
   state: z.string().min(2, "Estado obrigatório"),
   company: z.string().optional(),
+  tradingName: z.string().optional(),
+  stateRegistration: z.string().optional(),
 });
 
 type Step1Data = z.infer<typeof step1Schema>;
@@ -203,6 +205,8 @@ export default function RegisterPage() {
       city: "",
       state: "",
       company: "",
+      tradingName: "",
+      stateRegistration: "",
     },
   });
 
@@ -428,19 +432,47 @@ export default function RegisterPage() {
                     />
 
                     {personType === "juridica" && (
-                      <FormField
-                        control={form2.control}
-                        name="company"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Razão Social / Nome Fantasia</FormLabel>
-                            <FormControl>
-                              <Input {...field} data-testid="input-company" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                      <>
+                        <FormField
+                          control={form2.control}
+                          name="company"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Razão Social</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-company" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form2.control}
+                          name="tradingName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Nome Fantasia</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-trading-name" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form2.control}
+                          name="stateRegistration"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Inscrição Estadual</FormLabel>
+                              <FormControl>
+                                <Input {...field} data-testid="input-state-registration" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </>
                     )}
 
                     <FormField

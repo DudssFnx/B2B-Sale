@@ -46,6 +46,8 @@ export interface IStorage {
       firstName: string | null; 
       lastName: string | null; 
       company: string | null; 
+      tradingName: string | null;
+      stateRegistration: string | null;
       email: string | null; 
       phone: string | null; 
       personType: string | null;
@@ -430,6 +432,8 @@ export class DatabaseStorage implements IStorage {
       firstName: string | null; 
       lastName: string | null; 
       company: string | null; 
+      tradingName: string | null;
+      stateRegistration: string | null;
       email: string | null; 
       phone: string | null; 
       personType: string | null;
@@ -452,6 +456,8 @@ export class DatabaseStorage implements IStorage {
       firstName: users.firstName,
       lastName: users.lastName,
       company: users.company,
+      tradingName: users.tradingName,
+      stateRegistration: users.stateRegistration,
       email: users.email,
       phone: users.phone,
       personType: users.personType,
