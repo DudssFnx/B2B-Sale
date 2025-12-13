@@ -3,12 +3,13 @@ import { OrderTable, type Order } from "@/components/OrderTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShoppingCart, Package, ClipboardList, Users, ArrowRight, Loader2, TrendingUp, DollarSign, Calendar } from "lucide-react";
+import { ShoppingCart, Package, ClipboardList, Users, ArrowRight, Loader2, TrendingUp, DollarSign, Calendar, BarChart3, PieChart as PieChartIcon } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Order as SchemaOrder, Product, User } from "@shared/schema";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 interface OrderWithItems extends SchemaOrder {
   items?: { id: number; quantity: number }[];
@@ -21,6 +22,29 @@ interface PurchaseStats {
   monthlyStats: Array<{ month: string; total: number; count: number }>;
   topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }>;
 }
+
+interface AdminSalesStats {
+  totalRevenue: number;
+  totalOrders: number;
+  completedOrders: number;
+  pendingOrders: number;
+  averageOrderValue: number;
+  monthlyRevenue: Array<{ month: string; revenue: number; orders: number }>;
+  topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }>;
+  ordersByStatus: Array<{ status: string; count: number }>;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  'ORCAMENTO_ABERTO': 'Orçamento Aberto',
+  'ORCAMENTO_CONCLUIDO': 'Orçamento Concluído',
+  'PEDIDO_GERADO': 'Pedido Gerado',
+  'PEDIDO_FATURADO': 'Pedido Faturado',
+  'pending': 'Pendente',
+  'completed': 'Concluído',
+  'cancelled': 'Cancelado',
+};
+
+const STATUS_COLORS = ['hsl(var(--chart-1))', 'hsl(var(--chart-2))', 'hsl(var(--chart-3))', 'hsl(var(--chart-4))', 'hsl(var(--chart-5))'];
 
 function formatMonthLabel(monthStr: string): string {
   const [year, month] = monthStr.split('-');
@@ -50,6 +74,11 @@ export default function DashboardPage() {
   const { data: purchaseStats, isLoading: statsLoading } = useQuery<PurchaseStats>({
     queryKey: ['/api/me/purchase-stats'],
     enabled: isCustomer,
+  });
+
+  const { data: adminStats, isLoading: adminStatsLoading } = useQuery<AdminSalesStats>({
+    queryKey: ['/api/admin/sales-stats'],
+    enabled: isAdmin || isSales,
   });
 
   const recentOrders: Order[] = ordersData.slice(0, 5).map((order) => ({
@@ -202,6 +231,17 @@ export default function DashboardPage() {
     );
   }
 
+  const chartData = adminStats?.monthlyRevenue.map(item => ({
+    month: formatMonthLabel(item.month),
+    revenue: item.revenue,
+    orders: item.orders,
+  })) || [];
+
+  const pieData = adminStats?.ordersByStatus.map(item => ({
+    name: STATUS_LABELS[item.status] || item.status,
+    value: item.count,
+  })) || [];
+
   return (
     <div className="p-6 lg:p-8 space-y-8">
       <div>
@@ -209,45 +249,164 @@ export default function DashboardPage() {
         <p className="text-muted-foreground mt-1">Bem-vindo, {user?.firstName || user?.email}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {isAdmin ? (
-          <>
-            <StatCard
-              title="Total de Pedidos"
-              value={ordersLoading ? "..." : ordersData.length}
-              icon={ClipboardList}
-            />
-            <StatCard
-              title="Produtos"
-              value={productsLoading ? "..." : productsData.length}
-              icon={Package}
-            />
-            <StatCard
-              title="Clientes"
-              value={usersLoading ? "..." : usersData.filter(u => u.role === "customer").length}
-              icon={Users}
-            />
-          </>
-        ) : (
-          <>
-            <StatCard
-              title="Meus Pedidos"
-              value={ordersLoading ? "..." : ordersData.length}
-              icon={ClipboardList}
-            />
-            <StatCard
-              title="Pedidos Pendentes"
-              value={ordersLoading ? "..." : pendingOrdersCount}
-              icon={ShoppingCart}
-            />
-            <StatCard
-              title="Último Pedido"
-              value={ordersLoading ? "..." : lastOrderDate}
-              icon={Package}
-            />
-          </>
-        )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard
+          title="Faturamento Total"
+          value={adminStatsLoading ? "..." : `R$ ${(adminStats?.totalRevenue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon={DollarSign}
+          data-testid="stat-total-revenue"
+        />
+        <StatCard
+          title="Ticket Médio"
+          value={adminStatsLoading ? "..." : `R$ ${(adminStats?.averageOrderValue || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          icon={TrendingUp}
+          data-testid="stat-avg-order"
+        />
+        <StatCard
+          title="Pedidos Pendentes"
+          value={adminStatsLoading ? "..." : adminStats?.pendingOrders || 0}
+          icon={ClipboardList}
+          data-testid="stat-pending-orders"
+        />
+        <StatCard
+          title="Pedidos Faturados"
+          value={adminStatsLoading ? "..." : adminStats?.completedOrders || 0}
+          icon={Package}
+          data-testid="stat-completed-orders"
+        />
       </div>
+
+      {isAdmin && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard
+            title="Total de Pedidos"
+            value={ordersLoading ? "..." : ordersData.length}
+            icon={ClipboardList}
+          />
+          <StatCard
+            title="Produtos Cadastrados"
+            value={productsLoading ? "..." : productsData.length}
+            icon={Package}
+          />
+          <StatCard
+            title="Clientes Cadastrados"
+            value={usersLoading ? "..." : usersData.filter(u => u.role === "customer").length}
+            icon={Users}
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-muted-foreground" />
+              Faturamento Mensal
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {adminStatsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : chartData.length === 0 ? (
+              <p className="text-muted-foreground text-sm py-4">Nenhum dado disponível</p>
+            ) : (
+              <div className="h-[280px]" data-testid="chart-monthly-revenue">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                    <Tooltip 
+                      formatter={(value: number) => [`R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 'Faturamento']}
+                      labelStyle={{ color: 'hsl(var(--foreground))' }}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                    />
+                    <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <PieChartIcon className="h-5 w-5 text-muted-foreground" />
+              Pedidos por Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {adminStatsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : pieData.length === 0 ? (
+              <p className="text-muted-foreground text-sm py-4">Nenhum dado disponível</p>
+            ) : (
+              <div className="h-[280px]" data-testid="chart-orders-by-status">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value: number) => [value, 'Pedidos']}
+                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <ShoppingCart className="h-5 w-5 text-muted-foreground" />
+            Produtos Mais Vendidos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {adminStatsLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !adminStats?.topProducts?.length ? (
+            <p className="text-muted-foreground text-sm py-4">Nenhum produto vendido ainda</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {adminStats.topProducts.map((product, idx) => (
+                <div key={product.productId} className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted/50" data-testid={`admin-top-product-${product.productId}`}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-muted-foreground text-sm font-bold w-6">{idx + 1}.</span>
+                    <span className="text-sm font-medium truncate max-w-[180px]">{product.name}</span>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className="text-sm font-semibold">R$ {product.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-xs text-muted-foreground ml-2">({product.totalQuantity} un.)</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">

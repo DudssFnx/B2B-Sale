@@ -423,6 +423,76 @@ export class DatabaseStorage implements IStorage {
 
     return { totalSpent, totalOrders, completedOrders, monthlyStats, topProducts };
   }
+
+  async getAdminSalesStats(): Promise<{
+    totalRevenue: number;
+    totalOrders: number;
+    completedOrders: number;
+    pendingOrders: number;
+    averageOrderValue: number;
+    monthlyRevenue: Array<{ month: string; revenue: number; orders: number }>;
+    topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }>;
+    ordersByStatus: Array<{ status: string; count: number }>;
+  }> {
+    const allOrders = await db.select().from(orders);
+    
+    const totalRevenue = allOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+    const totalOrders = allOrders.length;
+    const completedStatuses = ['PEDIDO_FATURADO', 'completed'];
+    const pendingStatuses = ['ORCAMENTO_ABERTO', 'ORCAMENTO_CONCLUIDO', 'pending'];
+    const completedOrders = allOrders.filter(o => completedStatuses.includes(o.status)).length;
+    const pendingOrders = allOrders.filter(o => pendingStatuses.includes(o.status)).length;
+    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+    const monthlyMap = new Map<string, { revenue: number; orders: number }>();
+    for (const o of allOrders) {
+      const date = new Date(o.createdAt);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const curr = monthlyMap.get(key) || { revenue: 0, orders: 0 };
+      curr.revenue += parseFloat(o.total);
+      curr.orders += 1;
+      monthlyMap.set(key, curr);
+    }
+    const monthlyRevenue = Array.from(monthlyMap.entries())
+      .map(([month, data]) => ({ month, ...data }))
+      .sort((a, b) => a.month.localeCompare(b.month))
+      .slice(-6);
+
+    const statusMap = new Map<string, number>();
+    for (const o of allOrders) {
+      statusMap.set(o.status, (statusMap.get(o.status) || 0) + 1);
+    }
+    const ordersByStatus = Array.from(statusMap.entries())
+      .map(([status, count]) => ({ status, count }));
+
+    const orderIds = allOrders.map(o => o.id);
+    let topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }> = [];
+    
+    if (orderIds.length > 0) {
+      const items = await db.select({
+        productId: orderItems.productId,
+        quantity: orderItems.quantity,
+        price: orderItems.price,
+        name: products.name,
+      }).from(orderItems)
+        .leftJoin(products, eq(orderItems.productId, products.id))
+        .where(sql`${orderItems.orderId} = ANY(${orderIds})`);
+
+      const productMap = new Map<number, { name: string; totalQuantity: number; totalValue: number }>();
+      for (const item of items) {
+        const curr = productMap.get(item.productId) || { name: item.name || 'Produto', totalQuantity: 0, totalValue: 0 };
+        curr.totalQuantity += item.quantity;
+        curr.totalValue += item.quantity * parseFloat(item.price);
+        productMap.set(item.productId, curr);
+      }
+      topProducts = Array.from(productMap.entries())
+        .map(([productId, data]) => ({ productId, ...data }))
+        .sort((a, b) => b.totalValue - a.totalValue)
+        .slice(0, 10);
+    }
+
+    return { totalRevenue, totalOrders, completedOrders, pendingOrders, averageOrderValue, monthlyRevenue, topProducts, ordersByStatus };
+  }
 }
 
 export const storage = new DatabaseStorage();
