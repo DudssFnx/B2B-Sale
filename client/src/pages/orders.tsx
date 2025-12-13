@@ -254,7 +254,7 @@ export default function OrdersPage() {
     }
     const orderIds = Array.from(selectedOrders);
     orderIds.forEach(orderId => {
-      window.open(`/api/orders/${orderId}/pdf/${pdfType}`, '_blank');
+      window.open(`/api/orders/${orderId}/pdf?type=${pdfType}`, '_blank');
     });
     try {
       await Promise.all(orderIds.map(orderId => 
