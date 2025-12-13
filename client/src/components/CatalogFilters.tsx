@@ -39,7 +39,7 @@ export function CatalogFilters({
       <div className="relative flex-1 min-w-[200px]">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search products..."
+          placeholder="Buscar produtos..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
@@ -48,10 +48,10 @@ export function CatalogFilters({
       </div>
       <Select value={category} onValueChange={onCategoryChange}>
         <SelectTrigger className="w-[180px]" data-testid="select-category">
-          <SelectValue placeholder="Category" />
+          <SelectValue placeholder="Categoria" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Categories</SelectItem>
+          <SelectItem value="all">Todas Categorias</SelectItem>
           {categories.map((cat) => (
             <SelectItem key={cat} value={cat}>{cat}</SelectItem>
           ))}
@@ -59,10 +59,10 @@ export function CatalogFilters({
       </Select>
       <Select value={brand} onValueChange={onBrandChange}>
         <SelectTrigger className="w-[180px]" data-testid="select-brand">
-          <SelectValue placeholder="Brand" />
+          <SelectValue placeholder="Marca" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Brands</SelectItem>
+          <SelectItem value="all">Todas Marcas</SelectItem>
           {brands.map((b) => (
             <SelectItem key={b} value={b}>{b}</SelectItem>
           ))}
@@ -71,7 +71,7 @@ export function CatalogFilters({
       {hasFilters && (
         <Button variant="ghost" size="sm" onClick={onClearFilters} data-testid="button-clear-filters">
           <X className="h-4 w-4 mr-1" />
-          Clear
+          Limpar
         </Button>
       )}
     </div>
