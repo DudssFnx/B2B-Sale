@@ -2,19 +2,44 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/com
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
-import { Minus, Plus, Trash2, Package, ShoppingCart } from "lucide-react";
+import { Minus, Plus, Trash2, Package, ShoppingCart, Loader2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
-interface CartDrawerProps {
-  onGenerateOrder?: () => void;
-}
-
-export function CartDrawer({ onGenerateOrder }: CartDrawerProps) {
+export function CartDrawer() {
   const { items, isOpen, closeCart, updateQuantity, removeItem, total, clearCart } = useCart();
+  const { toast } = useToast();
+
+  const createOrderMutation = useMutation({
+    mutationFn: async () => {
+      const orderItems = items.map(item => ({
+        productId: parseInt(item.productId),
+        quantity: item.quantity,
+      }));
+      const response = await apiRequest("POST", "/api/orders", { items: orderItems });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      clearCart();
+      closeCart();
+      toast({
+        title: "Order Created",
+        description: `Order ${data.orderNumber} has been submitted successfully.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Order Failed",
+        description: error.message || "Failed to create order. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleGenerateOrder = () => {
-    onGenerateOrder?.();
-    clearCart();
-    closeCart();
+    createOrderMutation.mutate();
   };
 
   return (
@@ -58,7 +83,6 @@ export function CartDrawer({ onGenerateOrder }: CartDrawerProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6"
                       onClick={() => removeItem(item.id)}
                       data-testid={`button-remove-item-${item.id}`}
                     >
@@ -68,7 +92,6 @@ export function CartDrawer({ onGenerateOrder }: CartDrawerProps) {
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-6 w-6"
                         onClick={() => updateQuantity(item.id, item.quantity - 1)}
                         data-testid={`button-decrease-${item.id}`}
                       >
@@ -78,7 +101,6 @@ export function CartDrawer({ onGenerateOrder }: CartDrawerProps) {
                       <Button
                         variant="outline"
                         size="icon"
-                        className="h-6 w-6"
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
                         data-testid={`button-increase-${item.id}`}
                       >
@@ -102,7 +124,13 @@ export function CartDrawer({ onGenerateOrder }: CartDrawerProps) {
                 <Button variant="outline" onClick={clearCart} className="flex-1" data-testid="button-clear-cart">
                   Clear Cart
                 </Button>
-                <Button onClick={handleGenerateOrder} className="flex-1" data-testid="button-generate-order">
+                <Button 
+                  onClick={handleGenerateOrder} 
+                  className="flex-1" 
+                  disabled={createOrderMutation.isPending}
+                  data-testid="button-generate-order"
+                >
+                  {createOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   Generate Order
                 </Button>
               </SheetFooter>

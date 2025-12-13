@@ -2,19 +2,48 @@ import { StatCard } from "@/components/StatCard";
 import { OrderTable, type Order } from "@/components/OrderTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Package, ClipboardList, Users, ArrowRight } from "lucide-react";
+import { ShoppingCart, Package, ClipboardList, Users, ArrowRight, Loader2 } from "lucide-react";
 import { Link } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import type { Order as SchemaOrder, Product, User } from "@shared/schema";
+import { format } from "date-fns";
 
-// todo: remove mock functionality
-const mockRecentOrders: Order[] = [
-  { id: "1", orderNumber: "ORD-2024-001", customer: "Acme Corp", date: "Dec 10, 2024", status: "pending", total: 1250.00, itemCount: 5 },
-  { id: "2", orderNumber: "ORD-2024-002", customer: "TechStart Inc", date: "Dec 9, 2024", status: "approved", total: 890.50, itemCount: 3 },
-  { id: "3", orderNumber: "ORD-2024-003", customer: "BuildRight LLC", date: "Dec 8, 2024", status: "completed", total: 2340.00, itemCount: 12 },
-];
+interface OrderWithItems extends SchemaOrder {
+  items?: { id: number; quantity: number }[];
+}
 
 export default function DashboardPage() {
   const { user, isAdmin, isSales } = useAuth();
   const showAllOrders = isAdmin || isSales;
+
+  const { data: ordersData = [], isLoading: ordersLoading } = useQuery<OrderWithItems[]>({
+    queryKey: ['/api/orders'],
+  });
+
+  const { data: productsData = [], isLoading: productsLoading } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+    enabled: isAdmin,
+  });
+
+  const { data: usersData = [], isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ['/api/users'],
+    enabled: isAdmin,
+  });
+
+  const recentOrders: Order[] = ordersData.slice(0, 5).map((order) => ({
+    id: String(order.id),
+    orderNumber: order.orderNumber,
+    customer: order.userId.substring(0, 8) + "...",
+    date: format(new Date(order.createdAt), "MMM d, yyyy"),
+    status: order.status as Order["status"],
+    total: parseFloat(order.total),
+    itemCount: order.items?.length || 0,
+  }));
+
+  const pendingOrdersCount = ordersData.filter(o => o.status === "pending").length;
+  const lastOrderDate = ordersData.length > 0 
+    ? format(new Date(ordersData[0].createdAt), "MMM d")
+    : "N/A";
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
@@ -28,38 +57,35 @@ export default function DashboardPage() {
           <>
             <StatCard
               title="Total Orders"
-              value={142}
+              value={ordersLoading ? "..." : ordersData.length}
               icon={ClipboardList}
-              trend={{ value: 12, isPositive: true }}
             />
             <StatCard
               title="Products"
-              value={856}
+              value={productsLoading ? "..." : productsData.length}
               icon={Package}
-              trend={{ value: 5, isPositive: true }}
             />
             <StatCard
               title="Customers"
-              value={1248}
+              value={usersLoading ? "..." : usersData.filter(u => u.role === "customer").length}
               icon={Users}
-              trend={{ value: 8, isPositive: true }}
             />
           </>
         ) : (
           <>
             <StatCard
               title="My Orders"
-              value={24}
+              value={ordersLoading ? "..." : ordersData.length}
               icon={ClipboardList}
             />
             <StatCard
               title="Pending Orders"
-              value={3}
+              value={ordersLoading ? "..." : pendingOrdersCount}
               icon={ShoppingCart}
             />
             <StatCard
               title="Last Order"
-              value="Dec 10"
+              value={ordersLoading ? "..." : lastOrderDate}
               icon={Package}
             />
           </>
@@ -77,11 +103,21 @@ export default function DashboardPage() {
             </Button>
           </Link>
         </div>
-        <OrderTable
-          orders={mockRecentOrders}
-          showCustomer={showAllOrders}
-          onViewOrder={(order) => console.log("View order:", order.orderNumber)}
-        />
+        {ordersLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : recentOrders.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            No orders yet
+          </div>
+        ) : (
+          <OrderTable
+            orders={recentOrders}
+            showCustomer={showAllOrders}
+            onViewOrder={(order) => console.log("View order:", order.orderNumber)}
+          />
+        )}
       </div>
 
       <div className="flex gap-4">

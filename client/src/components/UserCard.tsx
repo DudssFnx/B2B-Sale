@@ -9,7 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { UserRole } from "@/contexts/AuthContext";
+
+export type UserRole = "admin" | "sales" | "customer";
 
 export interface UserData {
   id: string;

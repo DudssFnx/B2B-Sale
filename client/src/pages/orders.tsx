@@ -3,49 +3,105 @@ import { OrderTable, type Order } from "@/components/OrderTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw } from "lucide-react";
+import { Download, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import type { OrderStatus } from "@/components/StatusBadge";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Order as SchemaOrder } from "@shared/schema";
+import { format } from "date-fns";
 
-// todo: remove mock functionality
-const mockOrders: Order[] = [
-  { id: "1", orderNumber: "ORD-2024-001", customer: "Acme Corp", date: "Dec 10, 2024", status: "pending", total: 1250.00, itemCount: 5 },
-  { id: "2", orderNumber: "ORD-2024-002", customer: "TechStart Inc", date: "Dec 9, 2024", status: "approved", total: 890.50, itemCount: 3 },
-  { id: "3", orderNumber: "ORD-2024-003", customer: "BuildRight LLC", date: "Dec 8, 2024", status: "completed", total: 2340.00, itemCount: 12 },
-  { id: "4", orderNumber: "ORD-2024-004", customer: "SafeWorks Co", date: "Dec 7, 2024", status: "cancelled", total: 450.00, itemCount: 2 },
-  { id: "5", orderNumber: "ORD-2024-005", customer: "Acme Corp", date: "Dec 6, 2024", status: "processing", total: 1890.00, itemCount: 8 },
-  { id: "6", orderNumber: "ORD-2024-006", customer: "TechStart Inc", date: "Dec 5, 2024", status: "completed", total: 560.00, itemCount: 4 },
-];
+interface OrderWithItems extends SchemaOrder {
+  items?: { id: number; quantity: number }[];
+}
 
 export default function OrdersPage() {
   const { isAdmin, isSales } = useAuth();
   const { toast } = useToast();
-  const [orders, setOrders] = useState(mockOrders);
   const [activeTab, setActiveTab] = useState("all");
 
   const showAllOrders = isAdmin || isSales;
+
+  const { data: ordersData = [], isLoading, refetch } = useQuery<OrderWithItems[]>({
+    queryKey: ['/api/orders'],
+  });
+
+  const orders: Order[] = ordersData.map((order) => ({
+    id: String(order.id),
+    orderNumber: order.orderNumber,
+    customer: order.userId.substring(0, 8) + "...",
+    date: format(new Date(order.createdAt), "MMM d, yyyy"),
+    status: order.status as Order["status"],
+    total: parseFloat(order.total),
+    itemCount: order.items?.length || 0,
+  }));
 
   const filteredOrders = orders.filter((order) => {
     if (activeTab === "all") return true;
     return order.status === activeTab;
   });
 
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
+      await apiRequest("PATCH", `/api/orders/${orderId}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+    },
+  });
+
   const handleUpdateStatus = (order: Order, status: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === order.id ? { ...o, status } : o))
+    updateStatusMutation.mutate(
+      { orderId: order.id, status },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Order Updated",
+            description: `Order ${order.orderNumber} marked as ${status}`,
+          });
+        },
+        onError: () => {
+          toast({
+            title: "Error",
+            description: "Failed to update order status",
+            variant: "destructive",
+          });
+        },
+      }
     );
-    toast({
-      title: "Order Updated",
-      description: `Order ${order.orderNumber} marked as ${status}`,
-    });
   };
 
-  const handleExport = () => {
-    toast({
-      title: "Export Started",
-      description: "Your orders are being exported to CSV...",
-    });
-    console.log("Exporting orders:", filteredOrders);
+  const handleExport = async () => {
+    try {
+      const response = await fetch("/api/orders/export/csv", {
+        credentials: "include",
+      });
+      
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "orders.csv";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({
+        title: "Export Complete",
+        description: "Orders have been exported to CSV",
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Could not export orders",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -63,7 +119,7 @@ export default function OrdersPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setOrders([...mockOrders])} data-testid="button-refresh-orders">
+          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-orders">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
@@ -91,13 +147,23 @@ export default function OrdersPage() {
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">
-          <OrderTable
-            orders={filteredOrders}
-            showCustomer={showAllOrders}
-            onViewOrder={(order) => console.log("View:", order.orderNumber)}
-            onEditOrder={(order) => console.log("Edit:", order.orderNumber)}
-            onUpdateStatus={handleUpdateStatus}
-          />
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredOrders.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No orders found
+            </div>
+          ) : (
+            <OrderTable
+              orders={filteredOrders}
+              showCustomer={showAllOrders}
+              onViewOrder={(order) => console.log("View:", order.orderNumber)}
+              onEditOrder={(order) => console.log("Edit:", order.orderNumber)}
+              onUpdateStatus={handleUpdateStatus}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>

@@ -1,28 +1,33 @@
 import { useState } from "react";
-import { UserCard, type UserData } from "@/components/UserCard";
+import { UserCard, type UserData, type UserRole } from "@/components/UserCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, RefreshCw } from "lucide-react";
+import { Search, RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import type { UserRole } from "@/contexts/AuthContext";
-import type { UserStatus } from "@/components/StatusBadge";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { User } from "@shared/schema";
 
-// todo: remove mock functionality
-const mockUsers: UserData[] = [
-  { id: "1", name: "John Smith", email: "john@clientcorp.com", company: "Client Corp", role: "customer", status: "pending" },
-  { id: "2", name: "Sarah Johnson", email: "sarah@techstart.com", company: "TechStart Inc", role: "customer", status: "approved" },
-  { id: "3", name: "Mike Wilson", email: "mike@buildright.com", company: "BuildRight LLC", role: "customer", status: "approved" },
-  { id: "4", name: "Emily Brown", email: "emily@safeworks.com", company: "SafeWorks Co", role: "customer", status: "rejected" },
-  { id: "5", name: "David Lee", email: "david@company.com", role: "sales", status: "approved" },
-  { id: "6", name: "Anna Davis", email: "anna@company.com", role: "admin", status: "approved" },
-];
+type UserStatus = "pending" | "approved" | "rejected";
 
 export default function UsersPage() {
   const { toast } = useToast();
-  const [users, setUsers] = useState(mockUsers);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+
+  const { data: usersData = [], isLoading, refetch } = useQuery<User[]>({
+    queryKey: ['/api/users'],
+  });
+
+  const users: UserData[] = usersData.map((u) => ({
+    id: u.id,
+    name: `${u.firstName || ""} ${u.lastName || ""}`.trim() || u.email || "Unknown",
+    email: u.email || "",
+    company: u.company || undefined,
+    role: u.role as UserRole,
+    status: u.approved ? "approved" : "pending" as UserStatus,
+  }));
 
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
@@ -37,25 +42,55 @@ export default function UsersPage() {
     return matchesSearch;
   });
 
+  const updateUserMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<User> }) => {
+      await apiRequest("PATCH", `/api/users/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/users'] });
+    },
+  });
+
   const handleApprove = (user: UserData) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === user.id ? { ...u, status: "approved" as UserStatus } : u))
+    updateUserMutation.mutate(
+      { id: user.id, data: { approved: true } },
+      {
+        onSuccess: () => {
+          toast({ title: "User Approved", description: `${user.name} has been approved.` });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Failed to approve user", variant: "destructive" });
+        },
+      }
     );
-    toast({ title: "User Approved", description: `${user.name} has been approved.` });
   };
 
   const handleReject = (user: UserData) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === user.id ? { ...u, status: "rejected" as UserStatus } : u))
+    updateUserMutation.mutate(
+      { id: user.id, data: { approved: false } },
+      {
+        onSuccess: () => {
+          toast({ title: "User Rejected", description: `${user.name} has been rejected.` });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Failed to reject user", variant: "destructive" });
+        },
+      }
     );
-    toast({ title: "User Rejected", description: `${user.name} has been rejected.` });
   };
 
   const handleChangeRole = (user: UserData, role: UserRole) => {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === user.id ? { ...u, role } : u))
+    updateUserMutation.mutate(
+      { id: user.id, data: { role } },
+      {
+        onSuccess: () => {
+          toast({ title: "Role Updated", description: `${user.name} is now a ${role}.` });
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Failed to update role", variant: "destructive" });
+        },
+      }
     );
-    toast({ title: "Role Updated", description: `${user.name} is now a ${role}.` });
   };
 
   const pendingCount = users.filter((u) => u.status === "pending").length;
@@ -67,7 +102,7 @@ export default function UsersPage() {
           <h1 className="text-3xl font-semibold">User Management</h1>
           <p className="text-muted-foreground mt-1">Manage customer accounts and staff members</p>
         </div>
-        <Button variant="outline" onClick={() => setUsers([...mockUsers])} data-testid="button-refresh-users">
+        <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-users">
           <RefreshCw className="h-4 w-4 mr-2" />
           Refresh
         </Button>
@@ -99,7 +134,11 @@ export default function UsersPage() {
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">
-          {filteredUsers.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredUsers.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-muted-foreground">No users found</p>
             </div>

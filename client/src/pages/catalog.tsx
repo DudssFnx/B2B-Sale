@@ -3,23 +3,10 @@ import { CatalogFilters } from "@/components/CatalogFilters";
 import { ProductGrid } from "@/components/ProductGrid";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, Loader2 } from "lucide-react";
 import type { Product } from "@/components/ProductCard";
-
-// todo: remove mock functionality
-const mockProducts: Product[] = [
-  { id: "1", name: "Industrial Bearing Set - Heavy Duty", sku: "BRG-001", category: "Machinery", brand: "TechParts", price: 149.99, stock: 25 },
-  { id: "2", name: "Hydraulic Pump Motor 5HP", sku: "HYD-102", category: "Hydraulics", brand: "FlowMax", price: 599.00, stock: 8 },
-  { id: "3", name: "Steel Cable 10m - Industrial Grade", sku: "CBL-203", category: "Materials", brand: "SteelCo", price: 45.50, stock: 120 },
-  { id: "4", name: "Safety Valve Kit - Universal", sku: "VLV-304", category: "Safety", brand: "SafeFlow", price: 89.99, stock: 0 },
-  { id: "5", name: "Precision Gearbox Assembly", sku: "GBX-405", category: "Machinery", brand: "TechParts", price: 324.00, stock: 15 },
-  { id: "6", name: "Hydraulic Hose 20m", sku: "HOS-506", category: "Hydraulics", brand: "FlowMax", price: 78.50, stock: 45 },
-  { id: "7", name: "Aluminum Sheet 4x8ft", sku: "ALU-607", category: "Materials", brand: "SteelCo", price: 125.00, stock: 30 },
-  { id: "8", name: "Emergency Stop Button Kit", sku: "ESB-708", category: "Safety", brand: "SafeFlow", price: 34.99, stock: 200 },
-];
-
-const categories = ["Machinery", "Hydraulics", "Materials", "Safety"];
-const brands = ["TechParts", "FlowMax", "SteelCo", "SafeFlow"];
+import { useQuery } from "@tanstack/react-query";
+import type { Product as SchemaProduct, Category } from "@shared/schema";
 
 export default function CatalogPage() {
   const { addItem, openCart, itemCount } = useCart();
@@ -27,8 +14,49 @@ export default function CatalogPage() {
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
 
+  const { data: productsData = [], isLoading: productsLoading } = useQuery<SchemaProduct[]>({
+    queryKey: ['/api/products'],
+  });
+
+  const { data: categoriesData = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+
+  const categoryMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    categoriesData.forEach(cat => {
+      map[cat.id] = cat.name;
+    });
+    return map;
+  }, [categoriesData]);
+
+  const products: Product[] = useMemo(() => {
+    return productsData.map((p) => ({
+      id: String(p.id),
+      name: p.name,
+      sku: p.sku,
+      category: p.categoryId ? categoryMap[p.categoryId] || "Uncategorized" : "Uncategorized",
+      brand: p.brand || undefined,
+      price: parseFloat(p.price),
+      stock: p.stock,
+      image: p.image || undefined,
+    }));
+  }, [productsData, categoryMap]);
+
+  const categories = useMemo(() => {
+    return categoriesData.map(c => c.name);
+  }, [categoriesData]);
+
+  const brands = useMemo(() => {
+    const brandSet = new Set<string>();
+    productsData.forEach(p => {
+      if (p.brand) brandSet.add(p.brand);
+    });
+    return Array.from(brandSet);
+  }, [productsData]);
+
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter((product) => {
+    return products.filter((product) => {
       const matchesSearch = 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.sku.toLowerCase().includes(searchQuery.toLowerCase());
@@ -36,7 +64,7 @@ export default function CatalogPage() {
       const matchesBrand = brand === "all" || product.brand === brand;
       return matchesSearch && matchesCategory && matchesBrand;
     });
-  }, [searchQuery, category, brand]);
+  }, [products, searchQuery, category, brand]);
 
   const handleAddToCart = (product: Product) => {
     addItem({
@@ -84,11 +112,21 @@ export default function CatalogPage() {
 
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          Showing {filteredProducts.length} of {mockProducts.length} products
+          Showing {filteredProducts.length} of {products.length} products
         </p>
       </div>
 
-      <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} />
+      {productsLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No products available
+        </div>
+      ) : (
+        <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} />
+      )}
     </div>
   );
 }

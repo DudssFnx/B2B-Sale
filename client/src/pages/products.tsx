@@ -18,34 +18,37 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Pencil, Trash2, Upload } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import type { Product as SchemaProduct, Category } from "@shared/schema";
 
-// todo: remove mock functionality
 interface ProductData {
   id: string;
   name: string;
   sku: string;
   category: string;
+  categoryId: number | null;
   brand: string;
   price: number;
   stock: number;
 }
 
-const mockProducts: ProductData[] = [
-  { id: "1", name: "Industrial Bearing Set", sku: "BRG-001", category: "Machinery", brand: "TechParts", price: 149.99, stock: 25 },
-  { id: "2", name: "Hydraulic Pump Motor", sku: "HYD-102", category: "Hydraulics", brand: "FlowMax", price: 599.00, stock: 8 },
-  { id: "3", name: "Steel Cable 10m", sku: "CBL-203", category: "Materials", brand: "SteelCo", price: 45.50, stock: 120 },
-  { id: "4", name: "Safety Valve Kit", sku: "VLV-304", category: "Safety", brand: "SafeFlow", price: 89.99, stock: 0 },
-];
-
 const productSchema = z.object({
   name: z.string().min(1, "Name is required"),
   sku: z.string().min(1, "SKU is required"),
-  category: z.string().min(1, "Category is required"),
+  categoryId: z.string().optional(),
   brand: z.string().min(1, "Brand is required"),
   price: z.coerce.number().min(0, "Price must be positive"),
   stock: z.coerce.number().int().min(0, "Stock must be 0 or more"),
@@ -55,17 +58,40 @@ type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function ProductsPage() {
   const { toast } = useToast();
-  const [products, setProducts] = useState(mockProducts);
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
+
+  const { data: productsData = [], isLoading } = useQuery<SchemaProduct[]>({
+    queryKey: ['/api/products'],
+  });
+
+  const { data: categoriesData = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
+
+  const categoryMap: Record<number, string> = {};
+  categoriesData.forEach(cat => {
+    categoryMap[cat.id] = cat.name;
+  });
+
+  const products: ProductData[] = productsData.map((p) => ({
+    id: String(p.id),
+    name: p.name,
+    sku: p.sku,
+    category: p.categoryId ? categoryMap[p.categoryId] || "Uncategorized" : "Uncategorized",
+    categoryId: p.categoryId,
+    brand: p.brand || "",
+    price: parseFloat(p.price),
+    stock: p.stock,
+  }));
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
     defaultValues: {
       name: "",
       sku: "",
-      category: "",
+      categoryId: "",
       brand: "",
       price: 0,
       stock: 0,
@@ -78,36 +104,107 @@ export default function ProductsPage() {
       p.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const createProductMutation = useMutation({
+    mutationFn: async (data: ProductFormValues) => {
+      const payload = {
+        name: data.name,
+        sku: data.sku,
+        categoryId: data.categoryId ? parseInt(data.categoryId) : null,
+        brand: data.brand,
+        price: data.price.toFixed(2),
+        stock: data.stock,
+      };
+      await apiRequest("POST", "/api/products", payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+  });
+
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ProductFormValues }) => {
+      const payload = {
+        name: data.name,
+        sku: data.sku,
+        categoryId: data.categoryId ? parseInt(data.categoryId) : null,
+        brand: data.brand,
+        price: data.price.toFixed(2),
+        stock: data.stock,
+      };
+      await apiRequest("PATCH", `/api/products/${id}`, payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+  });
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/products/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+  });
+
   const openAddDialog = () => {
-    form.reset({ name: "", sku: "", category: "", brand: "", price: 0, stock: 0 });
+    form.reset({ name: "", sku: "", categoryId: "", brand: "", price: 0, stock: 0 });
     setEditingProduct(null);
     setIsDialogOpen(true);
   };
 
   const openEditDialog = (product: ProductData) => {
-    form.reset(product);
+    form.reset({
+      name: product.name,
+      sku: product.sku,
+      categoryId: product.categoryId ? String(product.categoryId) : "",
+      brand: product.brand,
+      price: product.price,
+      stock: product.stock,
+    });
     setEditingProduct(product);
     setIsDialogOpen(true);
   };
 
   const handleSubmit = (values: ProductFormValues) => {
     if (editingProduct) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...values } : p))
+      updateProductMutation.mutate(
+        { id: editingProduct.id, data: values },
+        {
+          onSuccess: () => {
+            toast({ title: "Product Updated", description: `${values.name} has been updated.` });
+            setIsDialogOpen(false);
+          },
+          onError: () => {
+            toast({ title: "Error", description: "Failed to update product", variant: "destructive" });
+          },
+        }
       );
-      toast({ title: "Product Updated", description: `${values.name} has been updated.` });
     } else {
-      const newProduct = { ...values, id: crypto.randomUUID() };
-      setProducts((prev) => [...prev, newProduct]);
-      toast({ title: "Product Created", description: `${values.name} has been added.` });
+      createProductMutation.mutate(values, {
+        onSuccess: () => {
+          toast({ title: "Product Created", description: `${values.name} has been added.` });
+          setIsDialogOpen(false);
+        },
+        onError: () => {
+          toast({ title: "Error", description: "Failed to create product", variant: "destructive" });
+        },
+      });
     }
-    setIsDialogOpen(false);
   };
 
   const handleDelete = (product: ProductData) => {
-    setProducts((prev) => prev.filter((p) => p.id !== product.id));
-    toast({ title: "Product Deleted", description: `${product.name} has been removed.` });
+    deleteProductMutation.mutate(product.id, {
+      onSuccess: () => {
+        toast({ title: "Product Deleted", description: `${product.name} has been removed.` });
+      },
+      onError: () => {
+        toast({ title: "Error", description: "Failed to delete product", variant: "destructive" });
+      },
+    });
   };
+
+  const isPending = createProductMutation.isPending || updateProductMutation.isPending;
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -117,10 +214,6 @@ export default function ProductsPage() {
           <p className="text-muted-foreground mt-1">Add, edit, and manage your product catalog</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" data-testid="button-bulk-import">
-            <Upload className="h-4 w-4 mr-2" />
-            Import CSV
-          </Button>
           <Button onClick={openAddDialog} data-testid="button-add-product">
             <Plus className="h-4 w-4 mr-2" />
             Add Product
@@ -139,64 +232,79 @@ export default function ProductsPage() {
         />
       </div>
 
-      <div className="rounded-lg border overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/50">
-              <TableHead className="font-semibold">SKU</TableHead>
-              <TableHead className="font-semibold">Name</TableHead>
-              <TableHead className="font-semibold">Category</TableHead>
-              <TableHead className="font-semibold">Brand</TableHead>
-              <TableHead className="font-semibold text-right">Price</TableHead>
-              <TableHead className="font-semibold text-right">Stock</TableHead>
-              <TableHead className="w-[100px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredProducts.map((product, idx) => (
-              <TableRow 
-                key={product.id} 
-                className={idx % 2 === 0 ? "bg-background" : "bg-muted/30"}
-                data-testid={`row-product-${product.id}`}
-              >
-                <TableCell>
-                  <Badge variant="outline">{product.sku}</Badge>
-                </TableCell>
-                <TableCell className="font-medium">{product.name}</TableCell>
-                <TableCell>{product.category}</TableCell>
-                <TableCell>{product.brand}</TableCell>
-                <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
-                <TableCell className="text-right">
-                  <span className={product.stock === 0 ? "text-destructive" : ""}>
-                    {product.stock}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1 justify-end">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => openEditDialog(product)}
-                      data-testid={`button-edit-product-${product.id}`}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(product)}
-                      className="text-destructive"
-                      data-testid={`button-delete-product-${product.id}`}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="font-semibold">SKU</TableHead>
+                <TableHead className="font-semibold">Name</TableHead>
+                <TableHead className="font-semibold">Category</TableHead>
+                <TableHead className="font-semibold">Brand</TableHead>
+                <TableHead className="font-semibold text-right">Price</TableHead>
+                <TableHead className="font-semibold text-right">Stock</TableHead>
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              {filteredProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                    No products found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProducts.map((product, idx) => (
+                  <TableRow 
+                    key={product.id} 
+                    className={idx % 2 === 0 ? "bg-background" : "bg-muted/30"}
+                    data-testid={`row-product-${product.id}`}
+                  >
+                    <TableCell>
+                      <Badge variant="outline">{product.sku}</Badge>
+                    </TableCell>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell>{product.category}</TableCell>
+                    <TableCell>{product.brand}</TableCell>
+                    <TableCell className="text-right">${product.price.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">
+                      <span className={product.stock === 0 ? "text-destructive" : ""}>
+                        {product.stock}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(product)}
+                          data-testid={`button-edit-product-${product.id}`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(product)}
+                          className="text-destructive"
+                          disabled={deleteProductMutation.isPending}
+                          data-testid={`button-delete-product-${product.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-lg">
@@ -234,13 +342,24 @@ export default function ProductsPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="category"
+                  name="categoryId"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-product-category" />
-                      </FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-product-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {categoriesData.map((cat) => (
+                            <SelectItem key={cat.id} value={String(cat.id)}>
+                              {cat.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -289,7 +408,8 @@ export default function ProductsPage() {
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" data-testid="button-save-product">
+                <Button type="submit" disabled={isPending} data-testid="button-save-product">
+                  {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                   {editingProduct ? "Save Changes" : "Add Product"}
                 </Button>
               </DialogFooter>
