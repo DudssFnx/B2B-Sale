@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { CatalogFilters } from "@/components/CatalogFilters";
 import { ProductGrid } from "@/components/ProductGrid";
 import { useCart } from "@/contexts/CartContext";
@@ -10,9 +11,19 @@ import type { Product as SchemaProduct, Category } from "@shared/schema";
 
 export default function CatalogPage() {
   const { addItem, openCart, itemCount, total } = useCart();
+  const searchString = useSearch();
+  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const categoryParam = params.get("category");
+    if (categoryParam) {
+      setCategory(decodeURIComponent(categoryParam));
+    }
+  }, [searchString]);
 
   const { data: productsData = [], isLoading: productsLoading } = useQuery<SchemaProduct[]>({
     queryKey: ['/api/products'],

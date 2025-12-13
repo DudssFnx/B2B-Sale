@@ -22,6 +22,7 @@ import {
   UserCheck,
   Settings,
   LogOut,
+  Grid3X3,
 } from "lucide-react";
 type UserRole = "admin" | "sales" | "customer";
 
@@ -34,16 +35,19 @@ interface AppSidebarProps {
 const menuItems = {
   customer: [
     { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Categories", url: "/categories", icon: Grid3X3 },
     { title: "Catalog", url: "/catalog", icon: Package },
     { title: "My Orders", url: "/orders", icon: ClipboardList },
   ],
   sales: [
     { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Categories", url: "/categories", icon: Grid3X3 },
     { title: "Catalog", url: "/catalog", icon: Package },
     { title: "All Orders", url: "/orders", icon: ClipboardList },
   ],
   admin: [
     { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Categories", url: "/categories", icon: Grid3X3 },
     { title: "Catalog", url: "/catalog", icon: Package },
     { title: "All Orders", url: "/orders", icon: ClipboardList },
     { title: "Products", url: "/products", icon: Package },

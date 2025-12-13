@@ -21,6 +21,7 @@ import ProductsPage from "@/pages/products";
 import UsersPage from "@/pages/users";
 import SettingsPage from "@/pages/settings";
 import CustomersPage from "@/pages/customers";
+import CategoriesPage from "@/pages/categories";
 
 function AuthenticatedApp() {
   const { user, logout, isAdmin, isApproved } = useAuth();
@@ -80,6 +81,7 @@ function AuthenticatedApp() {
           <main className="flex-1 overflow-auto">
             <Switch>
               <Route path="/" component={DashboardPage} />
+              <Route path="/categories" component={CategoriesPage} />
               <Route path="/catalog" component={CatalogPage} />
               <Route path="/orders" component={OrdersPage} />
               {isAdmin && <Route path="/products" component={ProductsPage} />}
