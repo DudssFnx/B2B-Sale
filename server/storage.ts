@@ -652,6 +652,7 @@ export class DatabaseStorage implements IStorage {
     completedOrders: number;
     monthlyStats: Array<{ month: string; total: number; count: number }>;
     topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }>;
+    lastMonthProducts: Array<{ productId: number; name: string; quantity: number; totalValue: number }>;
   }> {
     const userOrders = await db.select().from(orders).where(eq(orders.userId, userId));
     
@@ -676,6 +677,7 @@ export class DatabaseStorage implements IStorage {
 
     const orderIds = userOrders.map(o => o.id);
     let topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }> = [];
+    let lastMonthProducts: Array<{ productId: number; name: string; quantity: number; totalValue: number }> = [];
     
     if (orderIds.length > 0) {
       const items = await db.select({
@@ -683,6 +685,7 @@ export class DatabaseStorage implements IStorage {
         quantity: orderItems.quantity,
         price: orderItems.price,
         name: products.name,
+        orderId: orderItems.orderId,
       }).from(orderItems)
         .leftJoin(products, eq(orderItems.productId, products.id))
         .where(sql`${orderItems.orderId} = ANY(${orderIds})`);
@@ -698,9 +701,43 @@ export class DatabaseStorage implements IStorage {
         .map(([productId, data]) => ({ productId, ...data }))
         .sort((a, b) => b.totalQuantity - a.totalQuantity)
         .slice(0, 5);
+
+      // Get last month's orders for prediction
+      const now = new Date();
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const lastMonthOrders = userOrders.filter(o => {
+        const orderDate = new Date(o.createdAt);
+        return orderDate >= lastMonthStart && orderDate < currentMonthStart;
+      });
+      
+      if (lastMonthOrders.length > 0) {
+        const lastMonthOrderIds = lastMonthOrders.map(o => o.id);
+        const lastMonthItems = items.filter(item => lastMonthOrderIds.includes(item.orderId));
+        
+        const lastMonthMap = new Map<number, { name: string; quantity: number; totalValue: number }>();
+        for (const item of lastMonthItems) {
+          const itemValue = item.quantity * parseFloat(item.price);
+          const curr = lastMonthMap.get(item.productId);
+          if (curr) {
+            curr.quantity += item.quantity;
+            curr.totalValue += itemValue;
+          } else {
+            lastMonthMap.set(item.productId, { 
+              name: item.name || 'Produto', 
+              quantity: item.quantity, 
+              totalValue: itemValue
+            });
+          }
+        }
+        lastMonthProducts = Array.from(lastMonthMap.entries())
+          .map(([productId, data]) => ({ productId, ...data }))
+          .sort((a, b) => b.quantity - a.quantity);
+      }
     }
 
-    return { totalSpent, totalOrders, completedOrders, monthlyStats, topProducts };
+    return { totalSpent, totalOrders, completedOrders, monthlyStats, topProducts, lastMonthProducts };
   }
 
   async getAdminSalesStats(): Promise<{

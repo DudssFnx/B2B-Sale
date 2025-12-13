@@ -21,6 +21,7 @@ interface PurchaseStats {
   completedOrders: number;
   monthlyStats: Array<{ month: string; total: number; count: number }>;
   topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }>;
+  lastMonthProducts: Array<{ productId: number; name: string; quantity: number; totalValue: number }>;
 }
 
 interface AdminSalesStats {
@@ -97,6 +98,10 @@ export default function DashboardPage() {
     : "N/A";
 
   if (isCustomer) {
+    const predictionTotal = purchaseStats?.lastMonthProducts?.reduce(
+      (sum, p) => sum + p.totalValue, 0
+    ) || 0;
+
     return (
       <div className="p-6 lg:p-8 space-y-8">
         <div>
@@ -104,61 +109,7 @@ export default function DashboardPage() {
           <p className="text-muted-foreground mt-1">Bem-vindo, {user?.firstName || user?.email}</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard
-            title="Total Comprado"
-            value={statsLoading ? "..." : `R$ ${(purchaseStats?.totalSpent || 0).toFixed(2)}`}
-            icon={DollarSign}
-            data-testid="stat-total-spent"
-          />
-          <StatCard
-            title="Pedidos Realizados"
-            value={statsLoading ? "..." : purchaseStats?.totalOrders || 0}
-            icon={ClipboardList}
-            data-testid="stat-total-orders"
-          />
-          <StatCard
-            title="Pedidos Faturados"
-            value={statsLoading ? "..." : purchaseStats?.completedOrders || 0}
-            icon={Package}
-            data-testid="stat-completed-orders"
-          />
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                Compras por Mês
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {statsLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : !purchaseStats?.monthlyStats?.length ? (
-                <p className="text-muted-foreground text-sm py-4">Nenhuma compra registrada</p>
-              ) : (
-                <div className="space-y-3">
-                  {purchaseStats.monthlyStats.map((stat) => (
-                    <div key={stat.month} className="flex items-center justify-between gap-4" data-testid={`monthly-stat-${stat.month}`}>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm font-medium capitalize">{formatMonthLabel(stat.month)}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-sm font-semibold">R$ {stat.total.toFixed(2)}</span>
-                        <span className="text-xs text-muted-foreground ml-2">({stat.count} pedido{stat.count > 1 ? 's' : ''})</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -191,39 +142,56 @@ export default function DashboardPage() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold">Meus Pedidos Recentes</h2>
-            <Link href="/orders">
-              <Button variant="ghost" size="sm" data-testid="link-view-all-orders">
-                Ver Todos <ArrowRight className="h-4 w-4 ml-1" />
-              </Button>
-            </Link>
-          </div>
-          {ordersLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : recentOrders.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              Nenhum pedido ainda
-            </div>
-          ) : (
-            <OrderTable
-              orders={recentOrders}
-              showCustomer={false}
-              onViewOrder={(order) => console.log("View order:", order.orderNumber)}
-            />
-          )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                Previsao de Pedido
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Baseado nas suas compras do mes passado</p>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !purchaseStats?.lastMonthProducts?.length ? (
+                <p className="text-muted-foreground text-sm py-4">Nenhuma compra no mes passado para gerar previsao</p>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    {purchaseStats.lastMonthProducts.map((product) => (
+                      <div key={product.productId} className="flex items-center justify-between gap-4" data-testid={`prediction-product-${product.productId}`}>
+                        <span className="text-sm font-medium truncate max-w-[200px]">{product.name}</span>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-sm font-semibold">{product.quantity} un.</span>
+                          <span className="text-xs text-muted-foreground ml-2">R$ {product.totalValue.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-3 border-t flex items-center justify-between">
+                    <span className="text-sm font-medium">Total Estimado</span>
+                    <span className="text-lg font-bold">R$ {predictionTotal.toFixed(2)}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="flex gap-4">
           <Link href="/catalog">
             <Button data-testid="button-browse-catalog">
               <Package className="h-4 w-4 mr-2" />
-              Ver Catálogo
+              Ver Catalogo
+            </Button>
+          </Link>
+          <Link href="/orders">
+            <Button variant="outline" data-testid="link-view-all-orders">
+              <ClipboardList className="h-4 w-4 mr-2" />
+              Ver Pedidos
             </Button>
           </Link>
         </div>
