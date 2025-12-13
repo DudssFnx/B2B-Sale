@@ -756,7 +756,7 @@ export class DatabaseStorage implements IStorage {
         name: products.name,
       }).from(orderItems)
         .leftJoin(products, eq(orderItems.productId, products.id))
-        .where(sql`${orderItems.orderId} = ANY(${faturadoOrderIds})`);
+        .where(sql`${orderItems.orderId} IN (${sql.join(faturadoOrderIds.map(id => sql`${id}`), sql`, `)})`);
 
       const productMap = new Map<number, { name: string; totalQuantity: number; totalValue: number }>();
       for (const item of items) {
