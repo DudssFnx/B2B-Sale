@@ -4,10 +4,17 @@ import { CatalogFilters } from "@/components/CatalogFilters";
 import { ProductGrid } from "@/components/ProductGrid";
 import { useCart } from "@/contexts/CartContext";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Loader2, Package } from "lucide-react";
+import { ShoppingCart, Loader2, Package, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product } from "@/components/ProductCard";
 import { useQuery } from "@tanstack/react-query";
 import type { Product as SchemaProduct, Category } from "@shared/schema";
+
+interface ProductsResponse {
+  products: SchemaProduct[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
 
 export default function CatalogPage() {
   const { addItem, openCart, itemCount, total } = useCart();
@@ -16,22 +23,61 @@ export default function CatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [brand, setBrand] = useState("all");
+  const [page, setPage] = useState(1);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
+
+  const { data: categoriesData = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+  });
 
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const categoryParam = params.get("category");
     if (categoryParam) {
-      setCategory(decodeURIComponent(categoryParam));
+      const decodedCategory = decodeURIComponent(categoryParam);
+      setCategory(decodedCategory);
+      const cat = categoriesData.find(c => c.name === decodedCategory);
+      if (cat) {
+        setSelectedCategoryId(cat.id);
+      }
     }
-  }, [searchString]);
+  }, [searchString, categoriesData]);
 
-  const { data: productsData = [], isLoading: productsLoading } = useQuery<SchemaProduct[]>({
-    queryKey: ['/api/products'],
+  useEffect(() => {
+    if (category === "all") {
+      setSelectedCategoryId(undefined);
+    } else {
+      const cat = categoriesData.find(c => c.name === category);
+      setSelectedCategoryId(cat?.id);
+    }
+    setPage(1);
+  }, [category, categoriesData]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, brand]);
+
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('page', String(page));
+    params.set('limit', '50');
+    if (selectedCategoryId) params.set('categoryId', String(selectedCategoryId));
+    if (searchQuery) params.set('search', searchQuery);
+    return params.toString();
+  }, [page, selectedCategoryId, searchQuery]);
+
+  const { data: productsResponse, isLoading: productsLoading } = useQuery<ProductsResponse>({
+    queryKey: ['/api/products', queryParams],
+    queryFn: async () => {
+      const res = await fetch(`/api/products?${queryParams}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch products');
+      return res.json();
+    },
   });
 
-  const { data: categoriesData = [] } = useQuery<Category[]>({
-    queryKey: ['/api/categories'],
-  });
+  const productsData = productsResponse?.products || [];
+  const totalProducts = productsResponse?.total || 0;
+  const totalPages = productsResponse?.totalPages || 1;
 
   const categoryMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -68,14 +114,10 @@ export default function CatalogPage() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const matchesSearch = 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.sku.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = category === "all" || product.category === category;
       const matchesBrand = brand === "all" || product.brand === brand;
-      return matchesSearch && matchesCategory && matchesBrand;
+      return matchesBrand;
     });
-  }, [products, searchQuery, category, brand]);
+  }, [products, brand]);
 
   const handleAddToCart = (product: Product, quantity: number) => {
     addItem({
@@ -162,7 +204,37 @@ export default function CatalogPage() {
           </p>
         </div>
       ) : (
-        <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} />
+        <>
+          <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} />
+          
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 pt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Anterior
+              </Button>
+              <span className="text-sm text-muted-foreground px-4">
+                Página {page} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                data-testid="button-next-page"
+              >
+                Próxima
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

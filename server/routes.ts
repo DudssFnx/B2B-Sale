@@ -166,8 +166,10 @@ export async function registerRoutes(
     try {
       const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
       const search = req.query.search as string | undefined;
-      const products = await storage.getProducts({ categoryId, search });
-      res.json(products);
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const result = await storage.getProducts({ categoryId, search, page, limit });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ message: "Failed to fetch products" });

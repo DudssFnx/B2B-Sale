@@ -7,7 +7,7 @@ import {
   users, categories, products, orders, orderItems
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, ilike, and, or } from "drizzle-orm";
+import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
 
 export interface IStorage {
   // Users
@@ -26,7 +26,7 @@ export interface IStorage {
   deleteCategory(id: number): Promise<boolean>;
 
   // Products
-  getProducts(filters?: { categoryId?: number; search?: string }): Promise<Product[]>;
+  getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
   getProduct(id: number): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
@@ -110,7 +110,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Products
-  async getProducts(filters?: { categoryId?: number; search?: string }): Promise<Product[]> {
+  async getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 50;
+    const offset = (page - 1) * limit;
+    
     const conditions = [];
     if (filters?.categoryId) {
       conditions.push(eq(products.categoryId, filters.categoryId));
@@ -125,11 +129,22 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    let productList: Product[];
+    let totalResult: { count: number }[];
+    
     if (conditions.length > 0) {
-      return db.select().from(products).where(and(...conditions)).orderBy(desc(products.createdAt));
+      const whereClause = and(...conditions);
+      productList = await db.select().from(products).where(whereClause).orderBy(products.name).limit(limit).offset(offset);
+      totalResult = await db.select({ count: count() }).from(products).where(whereClause);
+    } else {
+      productList = await db.select().from(products).orderBy(products.name).limit(limit).offset(offset);
+      totalResult = await db.select({ count: count() }).from(products);
     }
     
-    return db.select().from(products).orderBy(desc(products.createdAt));
+    const total = totalResult[0]?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+    
+    return { products: productList, total, page, totalPages };
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
