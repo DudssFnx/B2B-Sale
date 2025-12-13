@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, RefreshCw, Loader2, Package, Eye, Plus, Trash2, Search } from "lucide-react";
+import { Download, RefreshCw, Loader2, Package, Eye, Plus, Trash2, Search, X, User as UserIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -62,6 +62,8 @@ export default function OrdersPage() {
   const [activeTab, setActiveTab] = useState("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+  const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
+  const [customerSearch, setCustomerSearch] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [productSearch, setProductSearch] = useState("");
 
@@ -83,6 +85,15 @@ export default function OrdersPage() {
 
   const productsData = productsResponse?.products || [];
   const approvedCustomers = customersData.filter(u => u.approved && u.role === "customer");
+  const filteredCustomers = customerSearch.length > 0 
+    ? approvedCustomers.filter(c => 
+        (c.firstName?.toLowerCase().includes(customerSearch.toLowerCase())) ||
+        (c.lastName?.toLowerCase().includes(customerSearch.toLowerCase())) ||
+        (c.company?.toLowerCase().includes(customerSearch.toLowerCase())) ||
+        (c.email?.toLowerCase().includes(customerSearch.toLowerCase())) ||
+        (c.tradingName?.toLowerCase().includes(customerSearch.toLowerCase()))
+      ).slice(0, 10)
+    : [];
   const filteredProducts = productsData.filter(p => 
     p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
     p.sku.toLowerCase().includes(productSearch.toLowerCase())
@@ -96,6 +107,8 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       setIsCreateOpen(false);
       setSelectedCustomerId("");
+      setSelectedCustomer(null);
+      setCustomerSearch("");
       setCartItems([]);
       setProductSearch("");
       toast({ title: "Sucesso", description: "Pedido criado com sucesso" });
@@ -104,6 +117,18 @@ export default function OrdersPage() {
       toast({ title: "Erro", description: err.message || "Falha ao criar pedido", variant: "destructive" });
     },
   });
+
+  const handleSelectCustomer = (customer: User) => {
+    setSelectedCustomerId(customer.id);
+    setSelectedCustomer(customer);
+    setCustomerSearch("");
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomerId("");
+    setSelectedCustomer(null);
+    setCustomerSearch("");
+  };
 
   const handleAddProduct = (product: Product) => {
     const existing = cartItems.find(item => item.productId === product.id);
@@ -326,18 +351,65 @@ export default function OrdersPage() {
               <div className="flex-1 overflow-auto space-y-4 py-4">
                 <div className="space-y-2">
                   <Label>Cliente *</Label>
-                  <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-                    <SelectTrigger data-testid="select-customer">
-                      <SelectValue placeholder="Selecione um cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {approvedCustomers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.firstName} {customer.lastName} - {customer.company || customer.email}
-                        </SelectItem>
+                  {selectedCustomer ? (
+                    <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/50">
+                      <UserIcon className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" data-testid="text-selected-customer">
+                          {selectedCustomer.firstName} {selectedCustomer.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {selectedCustomer.company || selectedCustomer.tradingName || selectedCustomer.email}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={handleClearCustomer}
+                        data-testid="button-clear-customer"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Digite o nome do cliente..."
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        className="pl-9"
+                        data-testid="input-search-customer"
+                      />
+                    </div>
+                  )}
+                  {!selectedCustomer && customerSearch && filteredCustomers.length > 0 && (
+                    <div className="border rounded-md max-h-40 overflow-y-auto">
+                      {filteredCustomers.map((customer) => (
+                        <div 
+                          key={customer.id}
+                          className="p-2 hover-elevate cursor-pointer flex items-center gap-2"
+                          onClick={() => handleSelectCustomer(customer)}
+                          data-testid={`customer-option-${customer.id}`}
+                        >
+                          <UserIcon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {customer.firstName} {customer.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {customer.company || customer.tradingName || customer.email}
+                            </p>
+                          </div>
+                        </div>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
+                  {!selectedCustomer && customerSearch && filteredCustomers.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      Nenhum cliente encontrado
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
