@@ -326,9 +326,18 @@ export async function syncProducts(): Promise<{ created: number; updated: number
   const stockMap = await fetchBlingStock(productIds);
   console.log(`Fetched stock for ${stockMap.size} products. Fetching details...`);
 
+  // First, fetch Bling categories to create ID mapping
+  console.log("Fetching categories from Bling for mapping...");
+  const blingCategories = await fetchBlingCategories();
+  const blingCatIdToName: Record<number, string> = {};
+  blingCategories.forEach(bc => {
+    blingCatIdToName[bc.id] = bc.descricao;
+  });
+  console.log(`Loaded ${Object.keys(blingCatIdToName).length} Bling categories for mapping`);
+
   const existingCategories = await db.select().from(categories);
   const categoryMap: Record<string, number> = {};
-  const categoryIdMap: Record<number, number> = {};
+  const blingToLocalCategoryId: Record<number, number> = {};
   existingCategories.forEach(c => {
     categoryMap[c.name.toLowerCase()] = c.id;
   });
@@ -353,34 +362,54 @@ export async function syncProducts(): Promise<{ created: number; updated: number
 
       let categoryId: number | null = null;
       
-      if (blingProduct.categoria?.id) {
-        const blingCatId = blingProduct.categoria.id;
+      // Try to get category from Bling product
+      const blingCat = blingProduct.categoria;
+      if (blingCat && blingCat.id) {
+        const blingCatId = blingCat.id;
         
-        if (categoryIdMap[blingCatId]) {
-          categoryId = categoryIdMap[blingCatId];
-        } else if (blingProduct.categoria.descricao) {
-          const catName = blingProduct.categoria.descricao.toLowerCase();
-          categoryId = categoryMap[catName] || null;
+        // Check if we already have this mapping
+        if (blingToLocalCategoryId[blingCatId]) {
+          categoryId = blingToLocalCategoryId[blingCatId];
+        } else {
+          // Get the category name from our Bling categories map
+          const blingCatName = blingCatIdToName[blingCatId] || blingCat.descricao;
           
-          if (!categoryId) {
-            const slug = blingProduct.categoria.descricao
-              .toLowerCase()
-              .normalize("NFD")
-              .replace(/[\u0300-\u036f]/g, "")
-              .replace(/[^a-z0-9]+/g, "-")
-              .replace(/(^-|-$)/g, "");
+          if (blingCatName) {
+            const catNameLower = blingCatName.toLowerCase();
+            categoryId = categoryMap[catNameLower] || null;
             
-            const [newCat] = await db.insert(categories).values({
-              name: blingProduct.categoria.descricao,
-              slug,
-            }).returning();
+            if (!categoryId) {
+              // Create new category
+              const slug = blingCatName
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/(^-|-$)/g, "");
+              
+              try {
+                const [newCat] = await db.insert(categories).values({
+                  name: blingCatName,
+                  slug,
+                }).returning();
+                
+                categoryId = newCat.id;
+                categoryMap[catNameLower] = categoryId;
+                console.log(`Created category: ${blingCatName} -> ${categoryId}`);
+              } catch (err) {
+                // Category might already exist
+                const existingCat = await db.select().from(categories)
+                  .where(eq(categories.slug, slug)).limit(1);
+                if (existingCat.length > 0) {
+                  categoryId = existingCat[0].id;
+                  categoryMap[catNameLower] = categoryId;
+                }
+              }
+            }
             
-            categoryId = newCat.id;
-            categoryMap[catName] = categoryId;
-          }
-          
-          if (categoryId) {
-            categoryIdMap[blingCatId] = categoryId;
+            if (categoryId) {
+              blingToLocalCategoryId[blingCatId] = categoryId;
+            }
           }
         }
       }
