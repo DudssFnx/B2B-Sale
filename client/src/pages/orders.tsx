@@ -56,14 +56,14 @@ export default function OrdersPage() {
       {
         onSuccess: () => {
           toast({
-            title: "Order Updated",
-            description: `Order ${order.orderNumber} marked as ${status}`,
+            title: "Pedido Atualizado",
+            description: `Pedido ${order.orderNumber} marcado como ${status}`,
           });
         },
         onError: () => {
           toast({
-            title: "Error",
-            description: "Failed to update order status",
+            title: "Erro",
+            description: "Falha ao atualizar status do pedido",
             variant: "destructive",
           });
         },
@@ -92,13 +92,13 @@ export default function OrdersPage() {
       document.body.removeChild(a);
       
       toast({
-        title: "Export Complete",
-        description: "Orders have been exported to CSV",
+        title: "Exportação Concluída",
+        description: "Os pedidos foram exportados para CSV",
       });
     } catch (error) {
       toast({
-        title: "Export Failed",
-        description: "Could not export orders",
+        title: "Falha na Exportação",
+        description: "Não foi possível exportar os pedidos",
         variant: "destructive",
       });
     }
@@ -109,24 +109,24 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-semibold">
-            {showAllOrders ? "All Orders" : "My Orders"}
+            {showAllOrders ? "Todos os Pedidos" : "Meus Pedidos"}
           </h1>
           <p className="text-muted-foreground mt-1">
             {showAllOrders 
-              ? "Manage and track all customer orders"
-              : "View and track your order history"
+              ? "Gerencie e acompanhe todos os pedidos de clientes"
+              : "Visualize e acompanhe seu histórico de pedidos"
             }
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-orders">
             <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            Atualizar
           </Button>
           {showAllOrders && (
             <Button onClick={handleExport} data-testid="button-export-orders">
               <Download className="h-4 w-4 mr-2" />
-              Export CSV
+              Exportar CSV
             </Button>
           )}
         </div>
@@ -134,15 +134,15 @@ export default function OrdersPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="all" data-testid="tab-all">All ({orders.length})</TabsTrigger>
+          <TabsTrigger value="all" data-testid="tab-all">Todos ({orders.length})</TabsTrigger>
           <TabsTrigger value="pending" data-testid="tab-pending">
-            Pending ({orders.filter(o => o.status === "pending").length})
+            Pendentes ({orders.filter(o => o.status === "pending").length})
           </TabsTrigger>
           <TabsTrigger value="approved" data-testid="tab-approved">
-            Approved ({orders.filter(o => o.status === "approved").length})
+            Aprovados ({orders.filter(o => o.status === "approved").length})
           </TabsTrigger>
           <TabsTrigger value="completed" data-testid="tab-completed">
-            Completed ({orders.filter(o => o.status === "completed").length})
+            Concluídos ({orders.filter(o => o.status === "completed").length})
           </TabsTrigger>
         </TabsList>
 
@@ -153,7 +153,7 @@ export default function OrdersPage() {
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
-              No orders found
+              Nenhum pedido encontrado
             </div>
           ) : (
             <OrderTable

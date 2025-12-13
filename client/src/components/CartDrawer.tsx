@@ -25,14 +25,14 @@ export function CartDrawer() {
       clearCart();
       closeCart();
       toast({
-        title: "Order Created",
-        description: `Order ${data.orderNumber} has been submitted successfully.`,
+        title: "Pedido Criado",
+        description: `Pedido ${data.orderNumber} foi enviado com sucesso.`,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Order Failed",
-        description: error.message || "Failed to create order. Please try again.",
+        title: "Falha no Pedido",
+        description: error.message || "Falha ao criar pedido. Por favor, tente novamente.",
         variant: "destructive",
       });
     },
@@ -48,15 +48,15 @@ export function CartDrawer() {
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            Shopping Cart
+            Carrinho de Compras
           </SheetTitle>
         </SheetHeader>
 
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
             <Package className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <p className="text-lg font-medium">Your cart is empty</p>
-            <p className="text-sm text-muted-foreground mt-1">Add products to generate an order</p>
+            <p className="text-lg font-medium">Seu carrinho está vazio</p>
+            <p className="text-sm text-muted-foreground mt-1">Adicione produtos para gerar um pedido</p>
           </div>
         ) : (
           <>
@@ -122,7 +122,7 @@ export function CartDrawer() {
               </div>
               <SheetFooter className="gap-2 sm:gap-2">
                 <Button variant="outline" onClick={clearCart} className="flex-1" data-testid="button-clear-cart">
-                  Clear Cart
+                  Limpar Carrinho
                 </Button>
                 <Button 
                   onClick={handleGenerateOrder} 
@@ -131,7 +131,7 @@ export function CartDrawer() {
                   data-testid="button-generate-order"
                 >
                   {createOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Generate Order
+                  Gerar Pedido
                 </Button>
               </SheetFooter>
             </div>

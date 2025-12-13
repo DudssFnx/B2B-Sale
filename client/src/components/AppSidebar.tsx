@@ -35,27 +35,27 @@ interface AppSidebarProps {
 
 const menuItems = {
   customer: [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
-    { title: "Categories", url: "/categories", icon: Grid3X3 },
-    { title: "Catalog", url: "/catalog", icon: Package },
-    { title: "My Orders", url: "/orders", icon: ClipboardList },
+    { title: "Painel", url: "/", icon: LayoutDashboard },
+    { title: "Categorias", url: "/categories", icon: Grid3X3 },
+    { title: "Catálogo", url: "/catalog", icon: Package },
+    { title: "Meus Pedidos", url: "/orders", icon: ClipboardList },
   ],
   sales: [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
-    { title: "Categories", url: "/categories", icon: Grid3X3 },
-    { title: "Catalog", url: "/catalog", icon: Package },
-    { title: "All Orders", url: "/orders", icon: ClipboardList },
+    { title: "Painel", url: "/", icon: LayoutDashboard },
+    { title: "Categorias", url: "/categories", icon: Grid3X3 },
+    { title: "Catálogo", url: "/catalog", icon: Package },
+    { title: "Todos os Pedidos", url: "/orders", icon: ClipboardList },
   ],
   admin: [
-    { title: "Dashboard", url: "/", icon: LayoutDashboard },
-    { title: "Categories", url: "/categories", icon: Grid3X3 },
-    { title: "Catalog", url: "/catalog", icon: Package },
-    { title: "All Orders", url: "/orders", icon: ClipboardList },
-    { title: "Products", url: "/products", icon: Package },
-    { title: "Customers", url: "/customers", icon: UserCheck },
-    { title: "Users", url: "/users", icon: Users },
+    { title: "Painel", url: "/", icon: LayoutDashboard },
+    { title: "Categorias", url: "/categories", icon: Grid3X3 },
+    { title: "Catálogo", url: "/catalog", icon: Package },
+    { title: "Todos os Pedidos", url: "/orders", icon: ClipboardList },
+    { title: "Produtos", url: "/products", icon: Package },
+    { title: "Clientes", url: "/customers", icon: UserCheck },
+    { title: "Usuários", url: "/users", icon: Users },
     { title: "Bling", url: "/bling", icon: Link2 },
-    { title: "Settings", url: "/settings", icon: Settings },
+    { title: "Configurações", url: "/settings", icon: Settings },
   ],
 };
 
@@ -78,14 +78,14 @@ export function AppSidebar({ userRole = "customer", userName = "User", onLogout 
             <ShoppingCart className="h-5 w-5 text-primary-foreground" />
           </div>
           <div>
-            <h2 className="font-semibold text-sm">B2B Catalog</h2>
-            <p className="text-xs text-muted-foreground capitalize">{userRole} Portal</p>
+            <h2 className="font-semibold text-sm">Lojamadrugadao</h2>
+            <p className="text-xs text-muted-foreground capitalize">Portal Atacado</p>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (

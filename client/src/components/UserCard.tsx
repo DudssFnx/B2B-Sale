@@ -56,7 +56,7 @@ export function UserCard({ user, onApprove, onReject, onChangeRole }: UserCardPr
             {user.company && (
               <p className="text-sm text-muted-foreground">{user.company}</p>
             )}
-            <p className="text-xs text-muted-foreground mt-1 capitalize">Role: {user.role}</p>
+            <p className="text-xs text-muted-foreground mt-1 capitalize">Função: {user.role}</p>
           </div>
           <div className="flex items-center gap-1">
             {user.status === "pending" && (
@@ -89,13 +89,13 @@ export function UserCard({ user, onApprove, onReject, onChangeRole }: UserCardPr
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => onChangeRole?.(user, "admin")}>
-                  Set as Admin
+                  Definir como Administrador
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onChangeRole?.(user, "sales")}>
-                  Set as Sales
+                  Definir como Vendedor
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onChangeRole?.(user, "customer")}>
-                  Set as Customer
+                  Definir como Cliente
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -48,25 +48,25 @@ export default function DashboardPage() {
   return (
     <div className="p-6 lg:p-8 space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Welcome back, {user?.name}</p>
+        <h1 className="text-3xl font-semibold">Painel</h1>
+        <p className="text-muted-foreground mt-1">Bem-vindo, {user?.name}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {isAdmin ? (
           <>
             <StatCard
-              title="Total Orders"
+              title="Total de Pedidos"
               value={ordersLoading ? "..." : ordersData.length}
               icon={ClipboardList}
             />
             <StatCard
-              title="Products"
+              title="Produtos"
               value={productsLoading ? "..." : productsData.length}
               icon={Package}
             />
             <StatCard
-              title="Customers"
+              title="Clientes"
               value={usersLoading ? "..." : usersData.filter(u => u.role === "customer").length}
               icon={Users}
             />
@@ -74,17 +74,17 @@ export default function DashboardPage() {
         ) : (
           <>
             <StatCard
-              title="My Orders"
+              title="Meus Pedidos"
               value={ordersLoading ? "..." : ordersData.length}
               icon={ClipboardList}
             />
             <StatCard
-              title="Pending Orders"
+              title="Pedidos Pendentes"
               value={ordersLoading ? "..." : pendingOrdersCount}
               icon={ShoppingCart}
             />
             <StatCard
-              title="Last Order"
+              title="Último Pedido"
               value={ordersLoading ? "..." : lastOrderDate}
               icon={Package}
             />
@@ -95,11 +95,11 @@ export default function DashboardPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-xl font-semibold">
-            {showAllOrders ? "Recent Orders" : "My Recent Orders"}
+            {showAllOrders ? "Pedidos Recentes" : "Meus Pedidos Recentes"}
           </h2>
           <Link href="/orders">
             <Button variant="ghost" size="sm" data-testid="link-view-all-orders">
-              View All <ArrowRight className="h-4 w-4 ml-1" />
+              Ver Todos <ArrowRight className="h-4 w-4 ml-1" />
             </Button>
           </Link>
         </div>
@@ -109,7 +109,7 @@ export default function DashboardPage() {
           </div>
         ) : recentOrders.length === 0 ? (
           <div className="text-center py-12 text-muted-foreground">
-            No orders yet
+            Nenhum pedido ainda
           </div>
         ) : (
           <OrderTable
@@ -124,7 +124,7 @@ export default function DashboardPage() {
         <Link href="/catalog">
           <Button data-testid="button-browse-catalog">
             <Package className="h-4 w-4 mr-2" />
-            Browse Catalog
+            Ver Catálogo
           </Button>
         </Link>
       </div>

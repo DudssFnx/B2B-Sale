@@ -10,12 +10,12 @@ interface StatusBadgeProps {
 }
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  pending: { label: "Pending", variant: "secondary" },
-  approved: { label: "Approved", variant: "default" },
-  processing: { label: "Processing", variant: "outline" },
-  completed: { label: "Completed", variant: "default" },
-  cancelled: { label: "Cancelled", variant: "destructive" },
-  rejected: { label: "Rejected", variant: "destructive" },
+  pending: { label: "Pendente", variant: "secondary" },
+  approved: { label: "Aprovado", variant: "default" },
+  processing: { label: "Processando", variant: "outline" },
+  completed: { label: "Concluído", variant: "default" },
+  cancelled: { label: "Cancelado", variant: "destructive" },
+  rejected: { label: "Rejeitado", variant: "destructive" },
 };
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {

@@ -39,10 +39,10 @@ export function OrderTable({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
-            <TableHead className="font-semibold">Order #</TableHead>
-            {showCustomer && <TableHead className="font-semibold">Customer</TableHead>}
-            <TableHead className="font-semibold">Date</TableHead>
-            <TableHead className="font-semibold">Items</TableHead>
+            <TableHead className="font-semibold">Pedido #</TableHead>
+            {showCustomer && <TableHead className="font-semibold">Cliente</TableHead>}
+            <TableHead className="font-semibold">Data</TableHead>
+            <TableHead className="font-semibold">Itens</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
             <TableHead className="font-semibold text-right">Total</TableHead>
             <TableHead className="w-[80px]"></TableHead>
@@ -62,7 +62,7 @@ export function OrderTable({
                 <TableCell>{order.customer}</TableCell>
               )}
               <TableCell className="text-muted-foreground">{order.date}</TableCell>
-              <TableCell>{order.itemCount} items</TableCell>
+              <TableCell>{order.itemCount} itens</TableCell>
               <TableCell>
                 <StatusBadge status={order.status} />
               </TableCell>
@@ -91,19 +91,19 @@ export function OrderTable({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onClick={() => onEditOrder?.(order)}>
-                        Edit Order
+                        Editar Pedido
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onUpdateStatus?.(order, "approved")}>
-                        Mark Approved
+                        Marcar como Aprovado
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onUpdateStatus?.(order, "completed")}>
-                        Mark Completed
+                        Marcar como Concluído
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         onClick={() => onUpdateStatus?.(order, "cancelled")}
                         className="text-destructive"
                       >
-                        Cancel Order
+                        Cancelar Pedido
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>

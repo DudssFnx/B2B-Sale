@@ -16,15 +16,15 @@ export default function SettingsPage() {
   const [erpEndpoint, setErpEndpoint] = useState("");
 
   const handleSaveERP = () => {
-    toast({ title: "Settings Saved", description: "ERP integration settings updated." });
+    toast({ title: "Configurações Salvas", description: "Configurações de integração ERP atualizadas." });
     console.log("ERP Endpoint:", erpEndpoint);
   };
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-4xl">
       <div>
-        <h1 className="text-3xl font-semibold">Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage your application preferences</p>
+        <h1 className="text-3xl font-semibold">Configurações</h1>
+        <p className="text-muted-foreground mt-1">Gerencie as preferências do seu aplicativo</p>
       </div>
 
       <div className="space-y-6">
@@ -32,15 +32,15 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5" />
-              Appearance
+              Aparência
             </CardTitle>
-            <CardDescription>Customize the look and feel of the application</CardDescription>
+            <CardDescription>Personalize a aparência do aplicativo</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Dark Mode</Label>
-                <p className="text-sm text-muted-foreground">Enable dark theme for the interface</p>
+                <Label>Modo Escuro</Label>
+                <p className="text-sm text-muted-foreground">Ativar tema escuro na interface</p>
               </div>
               <Switch
                 checked={theme === "dark"}
@@ -55,15 +55,15 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              Notifications
+              Notificações
             </CardTitle>
-            <CardDescription>Configure notification preferences</CardDescription>
+            <CardDescription>Configure as preferências de notificação</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Order Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive alerts for new orders</p>
+                <Label>Notificações de Pedidos</Label>
+                <p className="text-sm text-muted-foreground">Receber alertas para novos pedidos</p>
               </div>
               <Switch
                 checked={notifications}
@@ -78,13 +78,13 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Link2 className="h-5 w-5" />
-              ERP Integration
+              Integração ERP
             </CardTitle>
-            <CardDescription>Configure external ERP system connections</CardDescription>
+            <CardDescription>Configure conexões com sistemas ERP externos</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="erp-endpoint">Bling ERP API Endpoint</Label>
+              <Label htmlFor="erp-endpoint">Endpoint da API Bling ERP</Label>
               <Input
                 id="erp-endpoint"
                 placeholder="https://api.bling.com.br/v3"
@@ -93,17 +93,17 @@ export default function SettingsPage() {
                 data-testid="input-erp-endpoint"
               />
               <p className="text-xs text-muted-foreground">
-                Enter your Bling API endpoint for product and order synchronization
+                Insira o endpoint da API Bling para sincronização de produtos e pedidos
               </p>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Connection Status</p>
-                <p className="text-sm text-muted-foreground">Not connected</p>
+                <p className="text-sm font-medium">Status da Conexão</p>
+                <p className="text-sm text-muted-foreground">Não conectado</p>
               </div>
               <Button variant="outline" onClick={handleSaveERP} data-testid="button-test-connection">
-                Test Connection
+                Testar Conexão
               </Button>
             </div>
           </CardContent>
@@ -113,25 +113,25 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
-              Data Management
+              Gerenciamento de Dados
             </CardTitle>
-            <CardDescription>Manage your application data</CardDescription>
+            <CardDescription>Gerencie os dados do seu aplicativo</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Export All Data</p>
-                <p className="text-sm text-muted-foreground">Download products, orders, and users as CSV</p>
+                <p className="text-sm font-medium">Exportar Todos os Dados</p>
+                <p className="text-sm text-muted-foreground">Baixar produtos, pedidos e usuários como CSV</p>
               </div>
               <Button variant="outline" data-testid="button-export-data">
-                Export
+                Exportar
               </Button>
             </div>
             <Separator />
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Database Backup</p>
-                <p className="text-sm text-muted-foreground">Create a full database backup</p>
+                <p className="text-sm font-medium">Backup do Banco de Dados</p>
+                <p className="text-sm text-muted-foreground">Criar um backup completo do banco de dados</p>
               </div>
               <Button variant="outline" data-testid="button-backup">
                 Backup

@@ -31,15 +31,15 @@ export default function BlingPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("success") === "true") {
       toast({
-        title: "Connected to Bling",
-        description: "Your Bling account has been successfully connected.",
+        title: "Conectado ao Bling",
+        description: "Sua conta Bling foi conectada com sucesso.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/bling/status"] });
       window.history.replaceState({}, "", "/bling");
     } else if (params.get("error") === "auth_failed") {
       toast({
-        title: "Connection Failed",
-        description: "Failed to connect to Bling. Please try again.",
+        title: "Falha na Conexão",
+        description: "Falha ao conectar ao Bling. Por favor, tente novamente.",
         variant: "destructive",
       });
       window.history.replaceState({}, "", "/bling");
@@ -53,15 +53,15 @@ export default function BlingPage() {
     },
     onSuccess: (data: SyncResult) => {
       toast({
-        title: "Categories Synced",
-        description: `Created: ${data.created}, Updated: ${data.updated}`,
+        title: "Categorias Sincronizadas",
+        description: `Criadas: ${data.created}, Atualizadas: ${data.updated}`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync categories",
+        title: "Falha na Sincronização",
+        description: error.message || "Falha ao sincronizar categorias",
         variant: "destructive",
       });
     },
@@ -73,18 +73,18 @@ export default function BlingPage() {
       return response.json();
     },
     onSuccess: (data: SyncResult) => {
-      const message = `Created: ${data.created}, Updated: ${data.updated}`;
+      const message = `Criados: ${data.created}, Atualizados: ${data.updated}`;
       const errorCount = data.errors?.length || 0;
       toast({
-        title: "Products Synced",
-        description: errorCount > 0 ? `${message}. Errors: ${errorCount}` : message,
+        title: "Produtos Sincronizados",
+        description: errorCount > 0 ? `${message}. Erros: ${errorCount}` : message,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Sync Failed",
-        description: error.message || "Failed to sync products",
+        title: "Falha na Sincronização",
+        description: error.message || "Falha ao sincronizar produtos",
         variant: "destructive",
       });
     },
@@ -105,9 +105,9 @@ export default function BlingPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold" data-testid="text-bling-title">Bling Integration</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-bling-title">Integração Bling</h1>
         <p className="text-muted-foreground">
-          Connect your Bling account to sync products and categories.
+          Conecte sua conta Bling para sincronizar produtos e categorias.
         </p>
       </div>
 
@@ -115,39 +115,39 @@ export default function BlingPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <LinkIcon className="h-5 w-5" />
-            Connection Status
+            Status da Conexão
           </CardTitle>
           <CardDescription>
-            Status of your Bling API connection
+            Status da sua conexão com a API Bling
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Credentials:</span>
+              <span className="text-sm font-medium">Credenciais:</span>
               {status?.hasCredentials ? (
                 <Badge variant="default" className="flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" />
-                  Configured
+                  Configuradas
                 </Badge>
               ) : (
                 <Badge variant="destructive" className="flex items-center gap-1">
                   <XCircle className="h-3 w-3" />
-                  Missing
+                  Ausentes
                 </Badge>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Authentication:</span>
+              <span className="text-sm font-medium">Autenticação:</span>
               {status?.authenticated ? (
                 <Badge variant="default" className="flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" />
-                  Connected
+                  Conectado
                 </Badge>
               ) : (
                 <Badge variant="secondary" className="flex items-center gap-1">
                   <XCircle className="h-3 w-3" />
-                  Not Connected
+                  Não Conectado
                 </Badge>
               )}
             </div>
@@ -156,13 +156,13 @@ export default function BlingPage() {
           {status?.hasCredentials && !status?.authenticated && (
             <Button onClick={handleConnect} data-testid="button-bling-connect">
               <LinkIcon className="h-4 w-4 mr-2" />
-              Connect to Bling
+              Conectar ao Bling
             </Button>
           )}
 
           {!status?.hasCredentials && (
             <p className="text-sm text-muted-foreground">
-              Please configure BLING_CLIENT_ID and BLING_CLIENT_SECRET in your environment.
+              Por favor, configure BLING_CLIENT_ID e BLING_CLIENT_SECRET no seu ambiente.
             </p>
           )}
         </CardContent>
@@ -173,10 +173,10 @@ export default function BlingPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <RefreshCw className="h-5 w-5" />
-              Synchronization
+              Sincronização
             </CardTitle>
             <CardDescription>
-              Sync data from Bling to your catalog
+              Sincronize dados do Bling para seu catálogo
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -192,7 +192,7 @@ export default function BlingPage() {
                 ) : (
                   <FolderSync className="h-4 w-4 mr-2" />
                 )}
-                Sync Categories
+                Sincronizar Categorias
               </Button>
 
               <Button
@@ -205,12 +205,12 @@ export default function BlingPage() {
                 ) : (
                   <Package className="h-4 w-4 mr-2" />
                 )}
-                Sync Products
+                Sincronizar Produtos
               </Button>
             </div>
 
             <p className="text-sm text-muted-foreground">
-              Syncing will import or update categories and products from your Bling account.
+              A sincronização irá importar ou atualizar categorias e produtos da sua conta Bling.
             </p>
           </CardContent>
         </Card>

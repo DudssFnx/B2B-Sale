@@ -56,10 +56,10 @@ export default function UsersPage() {
       { id: user.id, data: { approved: true } },
       {
         onSuccess: () => {
-          toast({ title: "User Approved", description: `${user.name} has been approved.` });
+          toast({ title: "Usuário Aprovado", description: `${user.name} foi aprovado.` });
         },
         onError: () => {
-          toast({ title: "Error", description: "Failed to approve user", variant: "destructive" });
+          toast({ title: "Erro", description: "Falha ao aprovar usuário", variant: "destructive" });
         },
       }
     );
@@ -70,10 +70,10 @@ export default function UsersPage() {
       { id: user.id, data: { approved: false } },
       {
         onSuccess: () => {
-          toast({ title: "User Rejected", description: `${user.name} has been rejected.` });
+          toast({ title: "Usuário Rejeitado", description: `${user.name} foi rejeitado.` });
         },
         onError: () => {
-          toast({ title: "Error", description: "Failed to reject user", variant: "destructive" });
+          toast({ title: "Erro", description: "Falha ao rejeitar usuário", variant: "destructive" });
         },
       }
     );
@@ -84,10 +84,10 @@ export default function UsersPage() {
       { id: user.id, data: { role } },
       {
         onSuccess: () => {
-          toast({ title: "Role Updated", description: `${user.name} is now a ${role}.` });
+          toast({ title: "Função Atualizada", description: `${user.name} agora é ${role}.` });
         },
         onError: () => {
-          toast({ title: "Error", description: "Failed to update role", variant: "destructive" });
+          toast({ title: "Erro", description: "Falha ao atualizar função", variant: "destructive" });
         },
       }
     );
@@ -99,19 +99,19 @@ export default function UsersPage() {
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-semibold">User Management</h1>
-          <p className="text-muted-foreground mt-1">Manage customer accounts and staff members</p>
+          <h1 className="text-3xl font-semibold">Gerenciamento de Usuários</h1>
+          <p className="text-muted-foreground mt-1">Gerencie contas de clientes e membros da equipe</p>
         </div>
         <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-users">
           <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
+          Atualizar
         </Button>
       </div>
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder="Search users..."
+          placeholder="Buscar usuários..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="pl-9"
@@ -121,15 +121,15 @@ export default function UsersPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="all" data-testid="tab-all-users">All ({users.length})</TabsTrigger>
+          <TabsTrigger value="all" data-testid="tab-all-users">Todos ({users.length})</TabsTrigger>
           <TabsTrigger value="pending" data-testid="tab-pending-users">
-            Pending ({pendingCount})
+            Pendentes ({pendingCount})
           </TabsTrigger>
           <TabsTrigger value="customers" data-testid="tab-customers">
-            Customers ({users.filter(u => u.role === "customer").length})
+            Clientes ({users.filter(u => u.role === "customer").length})
           </TabsTrigger>
           <TabsTrigger value="staff" data-testid="tab-staff">
-            Staff ({users.filter(u => u.role === "admin" || u.role === "sales").length})
+            Equipe ({users.filter(u => u.role === "admin" || u.role === "sales").length})
           </TabsTrigger>
         </TabsList>
 
@@ -140,7 +140,7 @@ export default function UsersPage() {
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground">No users found</p>
+              <p className="text-muted-foreground">Nenhum usuário encontrado</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
