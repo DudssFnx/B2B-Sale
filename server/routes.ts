@@ -156,6 +156,53 @@ export async function registerRoutes(
     }
   });
 
+  // Local login endpoint (email/password)
+  app.post('/api/auth/login', async (req: any, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({ message: "E-mail e senha são obrigatórios" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ message: "E-mail ou senha incorretos" });
+      }
+
+      if (!user.password) {
+        return res.status(401).json({ message: "Esta conta não possui senha cadastrada" });
+      }
+
+      const isValidPassword = await bcrypt.compare(password, user.password);
+      if (!isValidPassword) {
+        return res.status(401).json({ message: "E-mail ou senha incorretos" });
+      }
+
+      // Create session for local user
+      req.login({ claims: { sub: user.id } }, (err: any) => {
+        if (err) {
+          console.error("Login error:", err);
+          return res.status(500).json({ message: "Erro ao fazer login" });
+        }
+        res.json({ message: "Login realizado com sucesso", user });
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Erro ao fazer login" });
+    }
+  });
+
+  // Local logout endpoint
+  app.post('/api/auth/logout', (req: any, res) => {
+    req.logout((err: any) => {
+      if (err) {
+        return res.status(500).json({ message: "Erro ao fazer logout" });
+      }
+      res.json({ message: "Logout realizado com sucesso" });
+    });
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

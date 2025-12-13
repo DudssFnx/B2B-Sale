@@ -8,7 +8,7 @@ export default function LandingPage() {
   const { theme, toggleTheme } = useTheme();
 
   const handleLogin = () => {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
   };
 
   const handleRegister = () => {

@@ -15,6 +15,7 @@ import { ShoppingCart, Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import RegisterPage from "@/pages/register";
+import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import CatalogPage from "@/pages/catalog";
 import OrdersPage from "@/pages/orders";
@@ -124,6 +125,7 @@ function AppContent() {
     return (
       <Switch>
         <Route path="/register" component={RegisterPage} />
+        <Route path="/login" component={LoginPage} />
         <Route component={LandingPage} />
       </Switch>
     );
