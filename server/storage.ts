@@ -776,7 +776,7 @@ export class DatabaseStorage implements IStorage {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const allCustomers = await db.select().from(users).where(eq(users.role, 'customer'));
-    const allOrders = await db.select().from(orders);
+    const allOrders = await db.select().from(orders).where(eq(orders.status, 'PEDIDO_FATURADO'));
 
     const customerOrdersMap = new Map<string, Order[]>();
     for (const order of allOrders) {
@@ -1015,8 +1015,9 @@ export class DatabaseStorage implements IStorage {
 
     const allProducts = await db.select().from(products);
     const allCategories = await db.select().from(categories);
-    const allOrders = await db.select().from(orders);
-    const allOrderItems = await db.select().from(orderItems);
+    const allOrders = await db.select().from(orders).where(eq(orders.status, 'PEDIDO_FATURADO'));
+    const faturadoOrderIds = new Set(allOrders.map(o => o.id));
+    const allOrderItems = (await db.select().from(orderItems)).filter(item => faturadoOrderIds.has(item.orderId));
 
     const categoryMap = new Map<number, string>();
     for (const cat of allCategories) {
