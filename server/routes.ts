@@ -378,6 +378,7 @@ export async function registerRoutes(
       const order = await storage.updateOrder(parseInt(req.params.id), {
         printed: true,
         printedAt: new Date(),
+        status: "PEDIDO_IMPRESSO",
       });
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
