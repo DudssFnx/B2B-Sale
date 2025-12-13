@@ -272,6 +272,16 @@ export default function LandingPage() {
               <span>Lojamadrugadao - Portal de Atacado</span>
             </div>
             <p>Plataforma exclusiva para lojistas, revendedores e distribuidores</p>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleLogin}
+              className="text-muted-foreground"
+              data-testid="button-employee-login"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Acesso Funcionários
+            </Button>
           </div>
         </div>
       </footer>
