@@ -29,6 +29,8 @@ export default function CustomersPage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<User | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
     personType: "juridica",
@@ -73,17 +75,39 @@ export default function CustomersPage() {
   }, [customers, searchQuery]);
 
   const updateUserMutation = useMutation({
-    mutationFn: async ({ id, approved }: { id: string; approved: boolean }) => {
-      await apiRequest("PATCH", `/api/users/${id}`, { approved });
+    mutationFn: async ({ id, data }: { id: string; data: Partial<User> }) => {
+      await apiRequest("PATCH", `/api/users/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/users'] });
     },
   });
 
+  const handleEdit = (customer: User) => {
+    setEditingCustomer(customer);
+    setShowEditDialog(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingCustomer) return;
+    updateUserMutation.mutate(
+      { id: editingCustomer.id, data: editingCustomer },
+      {
+        onSuccess: () => {
+          toast({ title: "Sucesso", description: "Cadastro atualizado com sucesso" });
+          setShowEditDialog(false);
+          setEditingCustomer(null);
+        },
+        onError: () => {
+          toast({ title: "Erro", description: "Falha ao atualizar cadastro", variant: "destructive" });
+        },
+      }
+    );
+  };
+
   const handleApprove = (user: User) => {
     updateUserMutation.mutate(
-      { id: user.id, approved: true },
+      { id: user.id, data: { approved: true } },
       {
         onSuccess: () => {
           toast({ title: "Cliente Aprovado", description: `${user.email} foi aprovado.` });
@@ -97,7 +121,7 @@ export default function CustomersPage() {
 
   const handleReject = (user: User) => {
     updateUserMutation.mutate(
-      { id: user.id, approved: false },
+      { id: user.id, data: { approved: false } },
       {
         onSuccess: () => {
           toast({ title: "Cliente Bloqueado", description: `${user.email} foi bloqueado.` });
@@ -343,7 +367,7 @@ export default function CustomersPage() {
                             Bloquear
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" data-testid={`button-edit-${customer.id}`}>
+                        <Button variant="ghost" size="icon" onClick={() => handleEdit(customer)} data-testid={`button-edit-${customer.id}`}>
                           <Pencil className="h-4 w-4" />
                         </Button>
                       </div>
@@ -610,6 +634,153 @@ export default function CustomersPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+          </DialogHeader>
+          {editingCustomer && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label>Razao Social / Empresa</Label>
+                  <Input
+                    value={editingCustomer.company || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, company: e.target.value})}
+                    data-testid="input-edit-company"
+                  />
+                </div>
+                <div>
+                  <Label>Nome</Label>
+                  <Input
+                    value={editingCustomer.firstName || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, firstName: e.target.value})}
+                    data-testid="input-edit-first-name"
+                  />
+                </div>
+                <div>
+                  <Label>Sobrenome</Label>
+                  <Input
+                    value={editingCustomer.lastName || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, lastName: e.target.value})}
+                    data-testid="input-edit-last-name"
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={editingCustomer.email || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, email: e.target.value})}
+                    data-testid="input-edit-email"
+                  />
+                </div>
+                <div>
+                  <Label>Telefone</Label>
+                  <Input
+                    value={editingCustomer.phone || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, phone: e.target.value})}
+                    data-testid="input-edit-phone"
+                  />
+                </div>
+                <div>
+                  <Label>CNPJ</Label>
+                  <Input
+                    value={editingCustomer.cnpj || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, cnpj: e.target.value})}
+                    data-testid="input-edit-cnpj"
+                  />
+                </div>
+                <div>
+                  <Label>Inscricao Estadual</Label>
+                  <Input
+                    value={editingCustomer.stateRegistration || ""}
+                    onChange={(e) => setEditingCustomer({...editingCustomer, stateRegistration: e.target.value})}
+                    data-testid="input-edit-state-registration"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h4 className="font-medium mb-3">Endereco</h4>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>CEP</Label>
+                    <Input
+                      value={editingCustomer.cep || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, cep: e.target.value})}
+                      data-testid="input-edit-cep"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Logradouro</Label>
+                    <Input
+                      value={editingCustomer.address || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, address: e.target.value})}
+                      data-testid="input-edit-address"
+                    />
+                  </div>
+                  <div>
+                    <Label>Numero</Label>
+                    <Input
+                      value={editingCustomer.addressNumber || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, addressNumber: e.target.value})}
+                      data-testid="input-edit-address-number"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <Label>Complemento</Label>
+                    <Input
+                      value={editingCustomer.complement || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, complement: e.target.value})}
+                      data-testid="input-edit-complement"
+                    />
+                  </div>
+                  <div>
+                    <Label>Bairro</Label>
+                    <Input
+                      value={editingCustomer.neighborhood || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, neighborhood: e.target.value})}
+                      data-testid="input-edit-neighborhood"
+                    />
+                  </div>
+                  <div>
+                    <Label>Cidade</Label>
+                    <Input
+                      value={editingCustomer.city || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, city: e.target.value})}
+                      data-testid="input-edit-city"
+                    />
+                  </div>
+                  <div>
+                    <Label>Estado</Label>
+                    <Input
+                      value={editingCustomer.state || ""}
+                      onChange={(e) => setEditingCustomer({...editingCustomer, state: e.target.value})}
+                      data-testid="input-edit-state"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => { setShowEditDialog(false); setEditingCustomer(null); }} data-testid="button-cancel-edit">
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleSaveEdit}
+                  disabled={updateUserMutation.isPending}
+                  data-testid="button-save-edit"
+                >
+                  {updateUserMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Salvar
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
