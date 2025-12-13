@@ -1,0 +1,123 @@
+import { useState } from "react";
+import { UserCard, type UserData } from "@/components/UserCard";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, RefreshCw } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import type { UserRole } from "@/contexts/AuthContext";
+import type { UserStatus } from "@/components/StatusBadge";
+
+// todo: remove mock functionality
+const mockUsers: UserData[] = [
+  { id: "1", name: "John Smith", email: "john@clientcorp.com", company: "Client Corp", role: "customer", status: "pending" },
+  { id: "2", name: "Sarah Johnson", email: "sarah@techstart.com", company: "TechStart Inc", role: "customer", status: "approved" },
+  { id: "3", name: "Mike Wilson", email: "mike@buildright.com", company: "BuildRight LLC", role: "customer", status: "approved" },
+  { id: "4", name: "Emily Brown", email: "emily@safeworks.com", company: "SafeWorks Co", role: "customer", status: "rejected" },
+  { id: "5", name: "David Lee", email: "david@company.com", role: "sales", status: "approved" },
+  { id: "6", name: "Anna Davis", email: "anna@company.com", role: "admin", status: "approved" },
+];
+
+export default function UsersPage() {
+  const { toast } = useToast();
+  const [users, setUsers] = useState(mockUsers);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("all");
+
+  const filteredUsers = users.filter((user) => {
+    const matchesSearch =
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.company?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (activeTab === "all") return matchesSearch;
+    if (activeTab === "pending") return matchesSearch && user.status === "pending";
+    if (activeTab === "customers") return matchesSearch && user.role === "customer";
+    if (activeTab === "staff") return matchesSearch && (user.role === "admin" || user.role === "sales");
+    return matchesSearch;
+  });
+
+  const handleApprove = (user: UserData) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === user.id ? { ...u, status: "approved" as UserStatus } : u))
+    );
+    toast({ title: "User Approved", description: `${user.name} has been approved.` });
+  };
+
+  const handleReject = (user: UserData) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === user.id ? { ...u, status: "rejected" as UserStatus } : u))
+    );
+    toast({ title: "User Rejected", description: `${user.name} has been rejected.` });
+  };
+
+  const handleChangeRole = (user: UserData, role: UserRole) => {
+    setUsers((prev) =>
+      prev.map((u) => (u.id === user.id ? { ...u, role } : u))
+    );
+    toast({ title: "Role Updated", description: `${user.name} is now a ${role}.` });
+  };
+
+  const pendingCount = users.filter((u) => u.status === "pending").length;
+
+  return (
+    <div className="p-6 lg:p-8 space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-semibold">User Management</h1>
+          <p className="text-muted-foreground mt-1">Manage customer accounts and staff members</p>
+        </div>
+        <Button variant="outline" onClick={() => setUsers([...mockUsers])} data-testid="button-refresh-users">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search users..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          data-testid="input-search-users"
+        />
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList>
+          <TabsTrigger value="all" data-testid="tab-all-users">All ({users.length})</TabsTrigger>
+          <TabsTrigger value="pending" data-testid="tab-pending-users">
+            Pending ({pendingCount})
+          </TabsTrigger>
+          <TabsTrigger value="customers" data-testid="tab-customers">
+            Customers ({users.filter(u => u.role === "customer").length})
+          </TabsTrigger>
+          <TabsTrigger value="staff" data-testid="tab-staff">
+            Staff ({users.filter(u => u.role === "admin" || u.role === "sales").length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab} className="mt-6">
+          {filteredUsers.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground">No users found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredUsers.map((user) => (
+                <UserCard
+                  key={user.id}
+                  user={user}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onChangeRole={handleChangeRole}
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
