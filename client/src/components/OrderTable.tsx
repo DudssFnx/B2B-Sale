@@ -106,7 +106,10 @@ export function OrderTable({
                         </DropdownMenuItem>
                       )}
                       {order.status === "PEDIDO_GERADO" && (
-                        <DropdownMenuItem onClick={() => onUpdateStatus?.(order, "PEDIDO_FATURADO")}>
+                        <DropdownMenuItem 
+                          onClick={() => onUpdateStatus?.(order, "PEDIDO_FATURADO")}
+                          className="text-foreground"
+                        >
                           Marcar como Faturado
                         </DropdownMenuItem>
                       )}
