@@ -3,15 +3,33 @@ import { OrderTable, type Order } from "@/components/OrderTable";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, RefreshCw, Loader2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Download, RefreshCw, Loader2, Package, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Order as SchemaOrder } from "@shared/schema";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Link } from "wouter";
 
 interface OrderWithItems extends SchemaOrder {
   items?: { id: number; quantity: number }[];
+}
+
+function getCustomerStatusLabel(status: string): string {
+  const inProgress = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "pending", "approved", "processing"];
+  if (inProgress.includes(status)) return "Em andamento";
+  if (status === "PEDIDO_FATURADO" || status === "completed") return "Faturado";
+  if (status === "PEDIDO_CANCELADO" || status === "cancelled") return "Cancelado";
+  return "Processando";
+}
+
+function getCustomerStatusVariant(status: string): "default" | "secondary" | "destructive" {
+  if (status === "PEDIDO_FATURADO" || status === "completed") return "default";
+  if (status === "PEDIDO_CANCELADO" || status === "cancelled") return "destructive";
+  return "secondary";
 }
 
 export default function OrdersPage() {
@@ -106,18 +124,81 @@ export default function OrdersPage() {
     }
   };
 
+  if (!showAllOrders) {
+    return (
+      <div className="p-6 lg:p-8 space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-3xl font-semibold">Meus Pedidos</h1>
+            <p className="text-muted-foreground mt-1">
+              Visualize e acompanhe seu histórico de pedidos
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => refetch()} data-testid="button-refresh-orders">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>Você ainda não tem pedidos</p>
+            <p className="text-sm mt-1">Adicione produtos ao carrinho para fazer seu primeiro pedido</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {orders.map((order) => (
+              <Card key={order.id} data-testid={`card-order-${order.id}`}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <span className="font-semibold" data-testid={`text-order-number-${order.id}`}>
+                          {order.orderNumber}
+                        </span>
+                        <Badge 
+                          variant={getCustomerStatusVariant(order.status)}
+                          data-testid={`badge-status-${order.id}`}
+                        >
+                          {getCustomerStatusLabel(order.status)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {format(new Date(ordersData.find(o => String(o.id) === order.id)?.createdAt || new Date()), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-lg">R$ {order.total.toFixed(2)}</p>
+                      <p className="text-sm text-muted-foreground">{order.itemCount} itens</p>
+                    </div>
+                    <Link href={`/orders/${order.id}`}>
+                      <Button variant="outline" size="sm" data-testid={`button-view-order-${order.id}`}>
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver detalhes
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 lg:p-8 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-semibold">
-            {showAllOrders ? "Todos os Pedidos" : "Meus Pedidos"}
-          </h1>
+          <h1 className="text-3xl font-semibold">Todos os Pedidos</h1>
           <p className="text-muted-foreground mt-1">
-            {showAllOrders 
-              ? "Gerencie e acompanhe todos os pedidos de clientes"
-              : "Visualize e acompanhe seu histórico de pedidos"
-            }
+            Gerencie e acompanhe todos os pedidos de clientes
           </p>
         </div>
         <div className="flex gap-2">
@@ -125,12 +206,10 @@ export default function OrdersPage() {
             <RefreshCw className="h-4 w-4 mr-2" />
             Atualizar
           </Button>
-          {showAllOrders && (
-            <Button onClick={handleExport} data-testid="button-export-orders">
-              <Download className="h-4 w-4 mr-2" />
-              Exportar CSV
-            </Button>
-          )}
+          <Button onClick={handleExport} data-testid="button-export-orders">
+            <Download className="h-4 w-4 mr-2" />
+            Exportar CSV
+          </Button>
         </div>
       </div>
 
@@ -150,7 +229,7 @@ export default function OrdersPage() {
             Faturados ({orders.filter(o => o.status === "PEDIDO_FATURADO").length})
           </TabsTrigger>
           <TabsTrigger value="legacy" data-testid="tab-legacy">
-            Outros ({orders.filter(o => !["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "PEDIDO_FATURADO", "PEDIDO_CANCELADO"].includes(o.status)).length})
+            Outros ({orders.filter(o => !newStatuses.includes(o.status)).length})
           </TabsTrigger>
         </TabsList>
 
@@ -166,7 +245,7 @@ export default function OrdersPage() {
           ) : (
             <OrderTable
               orders={filteredOrders}
-              showCustomer={showAllOrders}
+              showCustomer={true}
               onViewOrder={(order) => console.log("View:", order.orderNumber)}
               onEditOrder={(order) => console.log("Edit:", order.orderNumber)}
               onUpdateStatus={handleUpdateStatus}

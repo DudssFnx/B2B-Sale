@@ -372,6 +372,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/me/purchase-stats', isAuthenticated, isApproved, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getCustomerPurchaseStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching purchase stats:", error);
+      res.status(500).json({ message: "Failed to fetch purchase statistics" });
+    }
+  });
+
   // ========== USERS (Admin Only) ==========
   app.get('/api/users', isAuthenticated, isAdmin, async (req, res) => {
     try {
