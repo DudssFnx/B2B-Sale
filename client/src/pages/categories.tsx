@@ -59,9 +59,11 @@ export default function CategoriesPage() {
     queryKey: ['/api/categories'],
   });
 
-  const { data: productsData = [], isLoading: productsLoading } = useQuery<Product[]>({
-    queryKey: ['/api/products'],
+  const { data: productsResponse, isLoading: productsLoading } = useQuery<{ products: Product[]; total: number }>({
+    queryKey: ['/api/products', { limit: 10000 }],
   });
+  
+  const productsData = productsResponse?.products || [];
 
   const categoriesWithCounts = useMemo(() => {
     const countMap: Record<number, number> = {};
