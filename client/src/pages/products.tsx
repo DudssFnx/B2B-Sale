@@ -69,9 +69,11 @@ export default function ProductsPage() {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: productsData = [], isLoading } = useQuery<SchemaProduct[]>({
-    queryKey: ['/api/products'],
+  const { data: productsResponse, isLoading } = useQuery<{ products: SchemaProduct[]; total: number }>({
+    queryKey: ['/api/products', { limit: 10000 }],
   });
+  
+  const productsData = productsResponse?.products || [];
 
   const { data: categoriesData = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
