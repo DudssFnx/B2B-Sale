@@ -63,20 +63,94 @@ const BRAZILIAN_STATES = [
   { value: "TO", label: "Tocantins" },
 ];
 
+function validateCPF(cpf: string): boolean {
+  const cleanCpf = cpf.replace(/\D/g, "");
+  if (cleanCpf.length !== 11) return false;
+  if (/^(\d)\1{10}$/.test(cleanCpf)) return false;
+  
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    sum += parseInt(cleanCpf[i]) * (10 - i);
+  }
+  let remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleanCpf[9])) return false;
+  
+  sum = 0;
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(cleanCpf[i]) * (11 - i);
+  }
+  remainder = (sum * 10) % 11;
+  if (remainder === 10 || remainder === 11) remainder = 0;
+  if (remainder !== parseInt(cleanCpf[10])) return false;
+  
+  return true;
+}
+
+function validateCNPJ(cnpj: string): boolean {
+  const cleanCnpj = cnpj.replace(/\D/g, "");
+  if (cleanCnpj.length !== 14) return false;
+  if (/^(\d)\1{13}$/.test(cleanCnpj)) return false;
+  
+  const weights1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  const weights2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+  
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(cleanCnpj[i]) * weights1[i];
+  }
+  let remainder = sum % 11;
+  const digit1 = remainder < 2 ? 0 : 11 - remainder;
+  if (digit1 !== parseInt(cleanCnpj[12])) return false;
+  
+  sum = 0;
+  for (let i = 0; i < 13; i++) {
+    sum += parseInt(cleanCnpj[i]) * weights2[i];
+  }
+  remainder = sum % 11;
+  const digit2 = remainder < 2 ? 0 : 11 - remainder;
+  if (digit2 !== parseInt(cleanCnpj[13])) return false;
+  
+  return true;
+}
+
 const step1Schema = z.object({
   personType: z.enum(["juridica", "fisica"]),
   cnpj: z.string().optional(),
   cpf: z.string().optional(),
   email: z.string().email("E-mail inválido"),
-}).refine((data) => {
+}).superRefine((data, ctx) => {
   if (data.personType === "juridica") {
-    return data.cnpj && data.cnpj.length >= 14;
+    const cleanCnpj = (data.cnpj || "").replace(/\D/g, "");
+    if (!cleanCnpj || cleanCnpj.length < 14) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CNPJ obrigatório",
+        path: ["cnpj"],
+      });
+    } else if (!validateCNPJ(data.cnpj || "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CNPJ inválido",
+        path: ["cnpj"],
+      });
+    }
   } else {
-    return data.cpf && data.cpf.length >= 11;
+    const cleanCpf = (data.cpf || "").replace(/\D/g, "");
+    if (!cleanCpf || cleanCpf.length < 11) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CPF obrigatório",
+        path: ["cpf"],
+      });
+    } else if (!validateCPF(data.cpf || "")) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "CPF inválido",
+        path: ["cpf"],
+      });
+    }
   }
-}, {
-  message: "Documento obrigatório",
-  path: ["cnpj"],
 });
 
 const step2Schema = z.object({
