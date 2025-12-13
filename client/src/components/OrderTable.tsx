@@ -29,6 +29,8 @@ interface OrderTableProps {
   onEditOrder?: (order: Order) => void;
   onUpdateStatus?: (order: Order, status: string) => void;
   onPrintOrder?: (order: Order) => void;
+  onReserveStock?: (order: Order) => void;
+  onInvoice?: (order: Order) => void;
   showCustomer?: boolean;
   selectedOrderIds?: Set<string>;
   onSelectionChange?: (orderId: string, selected: boolean) => void;
@@ -41,6 +43,8 @@ export function OrderTable({
   onEditOrder, 
   onUpdateStatus,
   onPrintOrder,
+  onReserveStock,
+  onInvoice,
   showCustomer = true,
   selectedOrderIds,
   onSelectionChange,
@@ -155,16 +159,20 @@ export function OrderTable({
                         </DropdownMenuItem>
                       )}
                       {order.status === "ORCAMENTO_CONCLUIDO" && (
-                        <DropdownMenuItem onClick={() => onUpdateStatus?.(order, "PEDIDO_GERADO")}>
-                          Gerar Pedido
+                        <DropdownMenuItem 
+                          onClick={() => onReserveStock ? onReserveStock(order) : onUpdateStatus?.(order, "PEDIDO_GERADO")}
+                          data-testid={`button-reserve-stock-${order.id}`}
+                        >
+                          Gerar Pedido (Reservar Estoque)
                         </DropdownMenuItem>
                       )}
                       {order.status === "PEDIDO_GERADO" && (
                         <DropdownMenuItem 
-                          onClick={() => onUpdateStatus?.(order, "PEDIDO_FATURADO")}
+                          onClick={() => onInvoice ? onInvoice(order) : onUpdateStatus?.(order, "PEDIDO_FATURADO")}
                           className="text-foreground"
+                          data-testid={`button-invoice-${order.id}`}
                         >
-                          Marcar como Faturado
+                          Faturar Pedido
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem 

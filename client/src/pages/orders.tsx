@@ -223,8 +223,42 @@ export default function OrdersPage() {
     },
   });
 
+  const reserveStockMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await apiRequest("POST", `/api/orders/${orderId}/reserve`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({ title: "Sucesso", description: "Estoque reservado - Pedido gerado" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro", description: err.message || "Falha ao reservar estoque", variant: "destructive" });
+    },
+  });
+
+  const invoiceMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await apiRequest("POST", `/api/orders/${orderId}/invoice`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({ title: "Sucesso", description: "Pedido faturado com sucesso" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro", description: err.message || "Falha ao faturar pedido", variant: "destructive" });
+    },
+  });
+
   const handlePrintOrder = (order: Order) => {
     printOrderMutation.mutate(order.id);
+  };
+
+  const handleReserveStock = (order: Order) => {
+    reserveStockMutation.mutate(order.id);
+  };
+
+  const handleInvoice = (order: Order) => {
+    invoiceMutation.mutate(order.id);
   };
 
   const handleSelectionChange = (orderId: string, selected: boolean) => {
@@ -670,6 +704,8 @@ export default function OrdersPage() {
               onEditOrder={(order) => console.log("Edit:", order.orderNumber)}
               onUpdateStatus={handleUpdateStatus}
               onPrintOrder={handlePrintOrder}
+              onReserveStock={handleReserveStock}
+              onInvoice={handleInvoice}
             />
           )}
         </TabsContent>

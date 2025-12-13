@@ -714,17 +714,18 @@ export class DatabaseStorage implements IStorage {
     ordersByStatus: Array<{ status: string; count: number }>;
   }> {
     const allOrders = await db.select().from(orders);
-    
-    const totalRevenue = allOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
-    const totalOrders = allOrders.length;
     const completedStatuses = ['PEDIDO_FATURADO', 'completed'];
     const pendingStatuses = ['ORCAMENTO_ABERTO', 'ORCAMENTO_CONCLUIDO', 'pending'];
-    const completedOrders = allOrders.filter(o => completedStatuses.includes(o.status)).length;
+    
+    const faturadoOrders = allOrders.filter(o => completedStatuses.includes(o.status));
+    const totalRevenue = faturadoOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+    const totalOrders = allOrders.length;
+    const completedOrders = faturadoOrders.length;
     const pendingOrders = allOrders.filter(o => pendingStatuses.includes(o.status)).length;
-    const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+    const averageOrderValue = completedOrders > 0 ? totalRevenue / completedOrders : 0;
 
     const monthlyMap = new Map<string, { revenue: number; orders: number }>();
-    for (const o of allOrders) {
+    for (const o of faturadoOrders) {
       const date = new Date(o.createdAt);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       const curr = monthlyMap.get(key) || { revenue: 0, orders: 0 };
@@ -744,10 +745,10 @@ export class DatabaseStorage implements IStorage {
     const ordersByStatus = Array.from(statusMap.entries())
       .map(([status, count]) => ({ status, count }));
 
-    const orderIds = allOrders.map(o => o.id);
+    const faturadoOrderIds = faturadoOrders.map(o => o.id);
     let topProducts: Array<{ productId: number; name: string; totalQuantity: number; totalValue: number }> = [];
     
-    if (orderIds.length > 0) {
+    if (faturadoOrderIds.length > 0) {
       const items = await db.select({
         productId: orderItems.productId,
         quantity: orderItems.quantity,
@@ -755,7 +756,7 @@ export class DatabaseStorage implements IStorage {
         name: products.name,
       }).from(orderItems)
         .leftJoin(products, eq(orderItems.productId, products.id))
-        .where(sql`${orderItems.orderId} = ANY(${orderIds})`);
+        .where(sql`${orderItems.orderId} = ANY(${faturadoOrderIds})`);
 
       const productMap = new Map<number, { name: string; totalQuantity: number; totalValue: number }>();
       for (const item of items) {
