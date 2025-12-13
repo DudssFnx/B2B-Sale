@@ -92,6 +92,47 @@ export async function registerRoutes(
   // Setup Replit Auth
   await setupAuth(app);
 
+  // Public registration endpoint
+  app.post('/api/register', async (req, res) => {
+    try {
+      const data = req.body;
+      
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(data.email);
+      if (existingUser) {
+        return res.status(400).json({ message: "E-mail já cadastrado" });
+      }
+
+      // Create new user with pending approval
+      const newUser = await storage.createUser({
+        id: crypto.randomUUID(),
+        email: data.email,
+        firstName: data.firstName,
+        lastName: null,
+        profileImageUrl: null,
+        role: "customer",
+        company: data.company || null,
+        approved: false,
+        phone: data.phone || null,
+        personType: data.personType || null,
+        cnpj: data.cnpj || null,
+        cpf: data.cpf || null,
+        cep: data.cep || null,
+        address: data.address || null,
+        addressNumber: data.addressNumber || null,
+        complement: data.complement || null,
+        neighborhood: data.neighborhood || null,
+        city: data.city || null,
+        state: data.state || null,
+      });
+
+      res.status(201).json({ message: "Cadastro realizado com sucesso", userId: newUser.id });
+    } catch (error) {
+      console.error("Error registering user:", error);
+      res.status(500).json({ message: "Erro ao criar cadastro" });
+    }
+  });
+
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {

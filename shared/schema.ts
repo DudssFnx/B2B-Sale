@@ -25,6 +25,17 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("customer"), // admin, sales, customer
   company: text("company"),
   approved: boolean("approved").notNull().default(false),
+  phone: text("phone"),
+  personType: text("person_type"), // juridica, fisica
+  cnpj: text("cnpj"),
+  cpf: text("cpf"),
+  cep: text("cep"),
+  address: text("address"),
+  addressNumber: text("address_number"),
+  complement: text("complement"),
+  neighborhood: text("neighborhood"),
+  city: text("city"),
+  state: text("state"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
