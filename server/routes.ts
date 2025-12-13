@@ -444,20 +444,15 @@ export async function registerRoutes(
   });
 
   app.get("/api/bling/auth", isAuthenticated, isAdmin, (req, res) => {
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.headers["x-forwarded-host"] || req.get("host");
-    const redirectUri = `${protocol}://${host}/api/bling/callback`;
+    const redirectUri = process.env.BLING_REDIRECT_URI || `https://${req.get("host")}/api/bling/callback`;
     console.log("Bling OAuth redirect_uri:", redirectUri);
     const authUrl = blingService.getAuthorizationUrl(redirectUri);
-    console.log("Bling OAuth full auth URL:", authUrl);
     res.redirect(authUrl);
   });
 
   app.get("/api/bling/callback", async (req, res) => {
     const { code } = req.query;
-    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
-    const host = req.headers["x-forwarded-host"] || req.get("host");
-    const redirectUri = `${protocol}://${host}/api/bling/callback`;
+    const redirectUri = process.env.BLING_REDIRECT_URI || `https://${req.get("host")}/api/bling/callback`;
     try {
       await blingService.exchangeCodeForTokens(code as string, redirectUri);
       res.redirect("/bling?success=true");
