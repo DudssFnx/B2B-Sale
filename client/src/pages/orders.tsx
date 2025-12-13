@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Download, RefreshCw, Loader2, Package, Eye, Plus, Trash2, Search, X, User as UserIcon, Printer } from "lucide-react";
+import { Download, RefreshCw, Loader2, Package, Eye, Plus, Trash2, Search, X, User as UserIcon, Printer, Edit2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -310,6 +310,50 @@ export default function OrdersPage() {
       toast({ title: "Sucesso", description: `PDF gerado com ${orderIds.length} pedido(s)` });
     } catch (e) {
       toast({ title: "Erro", description: "Falha ao gerar PDF", variant: "destructive" });
+    }
+  };
+
+  const [isBatchStatusLoading, setIsBatchStatusLoading] = useState(false);
+
+  const handleBatchStatusChange = async (newStatus: string) => {
+    if (selectedOrders.size === 0) {
+      toast({ title: "Aviso", description: "Selecione pelo menos um pedido", variant: "destructive" });
+      return;
+    }
+    
+    setIsBatchStatusLoading(true);
+    const orderIds = Array.from(selectedOrders);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const orderId of orderIds) {
+      try {
+        if (newStatus === "PEDIDO_GERADO") {
+          await apiRequest("POST", `/api/orders/${orderId}/reserve`, {});
+        } else if (newStatus === "PEDIDO_FATURADO") {
+          await apiRequest("POST", `/api/orders/${orderId}/invoice`, {});
+        } else {
+          await apiRequest("PATCH", `/api/orders/${orderId}`, { status: newStatus });
+        }
+        successCount++;
+      } catch (e) {
+        errorCount++;
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    setSelectedOrders(new Set());
+    setIsBatchStatusLoading(false);
+
+    if (errorCount === 0) {
+      toast({ title: "Sucesso", description: `${successCount} pedido(s) atualizado(s) com sucesso` });
+    } else {
+      toast({ 
+        title: "Aviso", 
+        description: `${successCount} atualizado(s), ${errorCount} erro(s)`,
+        variant: errorCount > 0 && successCount === 0 ? "destructive" : "default"
+      });
     }
   };
 
@@ -650,6 +694,49 @@ export default function OrdersPage() {
                 data-testid="menu-print-conferencia"
               >
                 Conferência
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant={selectedOrders.size > 0 ? "default" : "outline"}
+                disabled={isBatchStatusLoading}
+                data-testid="button-batch-status"
+              >
+                {isBatchStatusLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Edit2 className="h-4 w-4 mr-2" />
+                )}
+                Alterar Status {selectedOrders.size > 0 ? `(${selectedOrders.size})` : ""}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem 
+                onClick={() => handleBatchStatusChange('ORCAMENTO_CONCLUIDO')}
+                data-testid="batch-status-orcamento-concluido"
+              >
+                Enviar Orçamento
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleBatchStatusChange('PEDIDO_GERADO')}
+                data-testid="batch-status-pedido-gerado"
+              >
+                Gerar Pedido (Reservar Estoque)
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleBatchStatusChange('PEDIDO_FATURADO')}
+                data-testid="batch-status-pedido-faturado"
+              >
+                Faturar Pedido
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => handleBatchStatusChange('PEDIDO_CANCELADO')}
+                data-testid="batch-status-pedido-cancelado"
+                className="text-destructive"
+              >
+                Cancelar Pedido
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
