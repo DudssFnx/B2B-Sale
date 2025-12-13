@@ -73,8 +73,8 @@ export function OrderTable({
             <TableHead className="font-semibold">Data</TableHead>
             <TableHead className="font-semibold">Itens</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="font-semibold">IMPRESSAO</TableHead>
-            <TableHead className="font-semibold">SITUAÇÃO</TableHead>
+            <TableHead className="font-semibold">Impressão</TableHead>
+            <TableHead className="font-semibold">Situação</TableHead>
             <TableHead className="font-semibold text-right">Total</TableHead>
             <TableHead className="w-[80px]"></TableHead>
           </TableRow>
