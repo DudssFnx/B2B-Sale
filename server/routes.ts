@@ -363,11 +363,11 @@ export async function registerRoutes(
         total += parseFloat(product.price) * item.quantity;
       }
       
-      // Create order with ORCAMENTO_ABERTO status (Mercos-style quote system)
+      // Create order with ORCAMENTO status
       const order = await storage.createOrder({
         userId,
         orderNumber: await generateOrderNumber(),
-        status: 'ORCAMENTO_ABERTO',
+        status: 'ORCAMENTO',
         total: total.toFixed(2),
         notes: notes || null,
       });
@@ -396,26 +396,36 @@ export async function registerRoutes(
       const orderId = parseInt(req.params.id);
       const { status } = req.body;
       
-      // Handle cancellation with stock return
-      if (status === 'PEDIDO_CANCELADO') {
+      // Handle cancellation with stock return from any status
+      if (status === 'CANCELADO') {
         const existingOrder = await storage.getOrder(orderId);
         if (!existingOrder) {
           return res.status(404).json({ message: "Order not found" });
         }
         
-        // If order was in PEDIDO_GERADO (stock reserved), release it
+        const items = await storage.getOrderItems(orderId);
+        
+        // If order was in PEDIDO_GERADO (stock reserved), release reserved stock
         if (existingOrder.status === 'PEDIDO_GERADO') {
-          const orderItems = await storage.getOrderItems(orderId);
-          for (const item of orderItems) {
+          for (const item of items) {
             await db.update(products)
               .set({ reservedStock: sql`GREATEST(reserved_stock - ${item.quantity}, 0)` })
               .where(eq(products.id, item.productId));
           }
         }
         
+        // If order was FATURADO (stock deducted), restore stock to available
+        if (existingOrder.status === 'FATURADO') {
+          for (const item of items) {
+            await db.update(products)
+              .set({ stock: sql`stock + ${item.quantity}` })
+              .where(eq(products.id, item.productId));
+          }
+        }
+        
         // Update order to cancelled
         const order = await storage.updateOrder(orderId, { 
-          status: 'PEDIDO_CANCELADO',
+          status: 'CANCELADO',
           reservedAt: null,
           reservedBy: null
         });
@@ -503,12 +513,22 @@ export async function registerRoutes(
         return res.status(404).json({ message: "Pedido não encontrado" });
       }
       
+      const items = await storage.getOrderItems(orderId);
+      
       // If order has reserved stock (PEDIDO_GERADO), release it back
       if (existingOrder.status === 'PEDIDO_GERADO') {
-        const items = await storage.getOrderItems(orderId);
         for (const item of items) {
           await db.update(products)
             .set({ reservedStock: sql`GREATEST(reserved_stock - ${item.quantity}, 0)` })
+            .where(eq(products.id, item.productId));
+        }
+      }
+      
+      // If order was FATURADO (stock deducted), restore stock
+      if (existingOrder.status === 'FATURADO') {
+        for (const item of items) {
+          await db.update(products)
+            .set({ stock: sql`stock + ${item.quantity}` })
             .where(eq(products.id, item.productId));
         }
       }

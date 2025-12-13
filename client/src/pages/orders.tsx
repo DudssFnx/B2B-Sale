@@ -43,16 +43,16 @@ interface OrderWithItems extends SchemaOrder {
 }
 
 function getCustomerStatusLabel(status: string): string {
-  const inProgress = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "pending", "approved", "processing"];
-  if (inProgress.includes(status)) return "Em andamento";
-  if (status === "PEDIDO_FATURADO" || status === "completed") return "Faturado";
-  if (status === "PEDIDO_CANCELADO" || status === "cancelled") return "Cancelado";
+  if (status === "ORCAMENTO") return "Orçamento";
+  if (status === "PEDIDO_GERADO") return "Pedido Gerado";
+  if (status === "FATURADO" || status === "completed") return "Faturado";
+  if (status === "CANCELADO" || status === "cancelled") return "Cancelado";
   return "Processando";
 }
 
 function getCustomerStatusVariant(status: string): "default" | "secondary" | "destructive" {
-  if (status === "PEDIDO_FATURADO" || status === "completed") return "default";
-  if (status === "PEDIDO_CANCELADO" || status === "cancelled") return "destructive";
+  if (status === "FATURADO" || status === "completed") return "default";
+  if (status === "CANCELADO" || status === "cancelled") return "destructive";
   return "secondary";
 }
 
@@ -193,7 +193,7 @@ export default function OrdersPage() {
     printed: order.printed || false,
   }));
 
-  const newStatuses = ["ORCAMENTO_ABERTO", "ORCAMENTO_CONCLUIDO", "PEDIDO_GERADO", "PEDIDO_FATURADO", "PEDIDO_CANCELADO"];
+  const newStatuses = ["ORCAMENTO", "PEDIDO_GERADO", "FATURADO", "CANCELADO"];
   
   const filteredOrders = orders.filter((order) => {
     if (activeTab === "all") return true;
@@ -371,7 +371,7 @@ export default function OrdersPage() {
       try {
         if (newStatus === "PEDIDO_GERADO") {
           await apiRequest("POST", `/api/orders/${orderId}/reserve`, {});
-        } else if (newStatus === "PEDIDO_FATURADO") {
+        } else if (newStatus === "FATURADO") {
           await apiRequest("POST", `/api/orders/${orderId}/invoice`, {});
         } else {
           await apiRequest("PATCH", `/api/orders/${orderId}`, { status: newStatus });
@@ -755,26 +755,20 @@ export default function OrdersPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem 
-                onClick={() => handleBatchStatusChange('ORCAMENTO_CONCLUIDO')}
-                data-testid="batch-status-orcamento-concluido"
-              >
-                Enviar Orçamento
-              </DropdownMenuItem>
-              <DropdownMenuItem 
                 onClick={() => handleBatchStatusChange('PEDIDO_GERADO')}
                 data-testid="batch-status-pedido-gerado"
               >
                 Gerar Pedido (Reservar Estoque)
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => handleBatchStatusChange('PEDIDO_FATURADO')}
-                data-testid="batch-status-pedido-faturado"
+                onClick={() => handleBatchStatusChange('FATURADO')}
+                data-testid="batch-status-faturado"
               >
                 Faturar Pedido
               </DropdownMenuItem>
               <DropdownMenuItem 
-                onClick={() => handleBatchStatusChange('PEDIDO_CANCELADO')}
-                data-testid="batch-status-pedido-cancelado"
+                onClick={() => handleBatchStatusChange('CANCELADO')}
+                data-testid="batch-status-cancelado"
                 className="text-destructive"
               >
                 Cancelar Pedido (Devolver Estoque)
@@ -810,17 +804,17 @@ export default function OrdersPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex-wrap">
           <TabsTrigger value="all" data-testid="tab-all">Todos ({orders.length})</TabsTrigger>
-          <TabsTrigger value="ORCAMENTO_ABERTO" data-testid="tab-orcamento-aberto">
-            Orçamentos ({orders.filter(o => o.status === "ORCAMENTO_ABERTO").length})
-          </TabsTrigger>
-          <TabsTrigger value="ORCAMENTO_CONCLUIDO" data-testid="tab-orcamento-concluido">
-            Enviados ({orders.filter(o => o.status === "ORCAMENTO_CONCLUIDO").length})
+          <TabsTrigger value="ORCAMENTO" data-testid="tab-orcamento">
+            Orçamentos ({orders.filter(o => o.status === "ORCAMENTO").length})
           </TabsTrigger>
           <TabsTrigger value="PEDIDO_GERADO" data-testid="tab-pedido-gerado">
             Pedidos ({orders.filter(o => o.status === "PEDIDO_GERADO").length})
           </TabsTrigger>
-          <TabsTrigger value="PEDIDO_FATURADO" data-testid="tab-pedido-faturado">
-            Faturados ({orders.filter(o => o.status === "PEDIDO_FATURADO").length})
+          <TabsTrigger value="FATURADO" data-testid="tab-faturado">
+            Faturados ({orders.filter(o => o.status === "FATURADO").length})
+          </TabsTrigger>
+          <TabsTrigger value="CANCELADO" data-testid="tab-cancelado">
+            Cancelados ({orders.filter(o => o.status === "CANCELADO").length})
           </TabsTrigger>
           <TabsTrigger value="legacy" data-testid="tab-legacy">
             Outros ({orders.filter(o => !newStatuses.includes(o.status)).length})

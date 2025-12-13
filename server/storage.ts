@@ -657,7 +657,7 @@ export class DatabaseStorage implements IStorage {
     
     const totalSpent = userOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
     const totalOrders = userOrders.length;
-    const completedStatuses = ['PEDIDO_FATURADO', 'completed'];
+    const completedStatuses = ['FATURADO', 'completed'];
     const completedOrders = userOrders.filter(o => completedStatuses.includes(o.status)).length;
 
     const monthlyMap = new Map<string, { total: number; count: number }>();
@@ -714,8 +714,8 @@ export class DatabaseStorage implements IStorage {
     ordersByStatus: Array<{ status: string; count: number }>;
   }> {
     const allOrders = await db.select().from(orders);
-    const completedStatuses = ['PEDIDO_FATURADO', 'completed'];
-    const pendingStatuses = ['ORCAMENTO_ABERTO', 'ORCAMENTO_CONCLUIDO', 'pending'];
+    const completedStatuses = ['FATURADO', 'completed'];
+    const pendingStatuses = ['ORCAMENTO', 'pending'];
     
     const faturadoOrders = allOrders.filter(o => completedStatuses.includes(o.status));
     const totalRevenue = faturadoOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
@@ -782,7 +782,7 @@ export class DatabaseStorage implements IStorage {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const allCustomers = await db.select().from(users).where(eq(users.role, 'customer'));
-    const allOrders = await db.select().from(orders).where(eq(orders.status, 'PEDIDO_FATURADO'));
+    const allOrders = await db.select().from(orders).where(eq(orders.status, 'FATURADO'));
 
     const customerOrdersMap = new Map<string, Order[]>();
     for (const order of allOrders) {
@@ -1021,7 +1021,7 @@ export class DatabaseStorage implements IStorage {
 
     const allProducts = await db.select().from(products);
     const allCategories = await db.select().from(categories);
-    const allOrders = await db.select().from(orders).where(eq(orders.status, 'PEDIDO_FATURADO'));
+    const allOrders = await db.select().from(orders).where(eq(orders.status, 'FATURADO'));
     const faturadoOrderIds = new Set(allOrders.map(o => o.id));
     const allOrderItems = (await db.select().from(orderItems)).filter(item => faturadoOrderIds.has(item.orderId));
 
