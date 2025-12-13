@@ -22,6 +22,7 @@ import UsersPage from "@/pages/users";
 import SettingsPage from "@/pages/settings";
 import CustomersPage from "@/pages/customers";
 import CategoriesPage from "@/pages/categories";
+import BlingPage from "@/pages/bling";
 
 function AuthenticatedApp() {
   const { user, logout, isAdmin, isApproved } = useAuth();
@@ -88,6 +89,7 @@ function AuthenticatedApp() {
               {isAdmin && <Route path="/customers" component={CustomersPage} />}
               {isAdmin && <Route path="/users" component={UsersPage} />}
               {isAdmin && <Route path="/settings" component={SettingsPage} />}
+              {isAdmin && <Route path="/bling" component={BlingPage} />}
               <Route component={NotFound} />
             </Switch>
           </main>

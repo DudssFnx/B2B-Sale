@@ -6,6 +6,7 @@ import { insertCategorySchema, insertProductSchema, insertOrderSchema, insertOrd
 import { z } from "zod";
 import multer from "multer";
 import { Client } from "@replit/object-storage";
+import * as blingService from "./services/bling";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -415,6 +416,53 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error uploading file:", error);
       res.status(500).json({ message: "Failed to upload file" });
+    }
+  });
+
+  // ========== BLING INTEGRATION ==========
+  app.get("/api/bling/status", isAuthenticated, isAdmin, async (req, res) => {
+    res.json(blingService.getStatus());
+  });
+
+  app.get("/api/bling/auth", isAuthenticated, isAdmin, (req, res) => {
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.headers["x-forwarded-host"] || req.get("host");
+    const redirectUri = `${protocol}://${host}/api/bling/callback`;
+    const authUrl = blingService.getAuthorizationUrl(redirectUri);
+    res.redirect(authUrl);
+  });
+
+  app.get("/api/bling/callback", async (req, res) => {
+    const { code } = req.query;
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const host = req.headers["x-forwarded-host"] || req.get("host");
+    const redirectUri = `${protocol}://${host}/api/bling/callback`;
+    try {
+      await blingService.exchangeCodeForTokens(code as string, redirectUri);
+      res.redirect("/bling?success=true");
+    } catch (error) {
+      console.error("Bling callback error:", error);
+      res.redirect("/bling?error=auth_failed");
+    }
+  });
+
+  app.post("/api/bling/sync/categories", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await blingService.syncCategories();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Bling sync categories error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/bling/sync/products", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await blingService.syncProducts();
+      res.json(result);
+    } catch (error: any) {
+      console.error("Bling sync products error:", error);
+      res.status(500).json({ error: error.message });
     }
   });
 
