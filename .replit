@@ -44,4 +44,3 @@ integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_database:1.0.
 [userenv]
 
 [userenv.shared]
-BLING_REDIRECT_URI = "https://b2b-wholesale-catalog-mayconeuzebio7.replit.app/api/bling/callback"
