@@ -447,7 +447,9 @@ export async function registerRoutes(
     const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     const host = req.headers["x-forwarded-host"] || req.get("host");
     const redirectUri = `${protocol}://${host}/api/bling/callback`;
+    console.log("Bling OAuth redirect_uri:", redirectUri);
     const authUrl = blingService.getAuthorizationUrl(redirectUri);
+    console.log("Bling OAuth full auth URL:", authUrl);
     res.redirect(authUrl);
   });
 
