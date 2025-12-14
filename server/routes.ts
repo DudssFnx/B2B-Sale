@@ -1250,6 +1250,24 @@ export async function registerRoutes(
 
   // ========== PDF GENERATION ==========
   
+  // Helper function to draw standard PDF header
+  function drawPdfHeader(doc: typeof PDFDocument.prototype, pdfType: string, orderNumber: string) {
+    const titles: Record<string, string> = {
+      separacao: 'PEDIDO - SEPARACAO',
+      cobranca: 'PEDIDO - COBRANCA',
+      conferencia: 'PEDIDO - CONFERENCIA'
+    };
+    
+    doc.fontSize(14).font('Helvetica-Bold').text('LOJAMADRUGADAO SAO PAULO', { align: 'center' });
+    doc.fontSize(10).font('Helvetica').text('CNPJ: 00.000.000/0001-00 | WhatsApp: (11) 99284-5596', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+    doc.moveDown(0.5);
+    doc.fontSize(16).font('Helvetica-Bold').text(`${titles[pdfType] || 'PEDIDO'}`, { align: 'center' });
+    doc.fontSize(12).text(`N. ${orderNumber}`, { align: 'center' });
+    doc.moveDown();
+  }
+
   // Batch PDF - generates a single PDF with multiple orders
   app.post('/api/orders/pdf/batch', isAuthenticated, isApproved, async (req: any, res) => {
     try {
@@ -1263,18 +1281,16 @@ export async function registerRoutes(
       const user = await storage.getUser(userId);
       
       const pdfType = type || 'cobranca';
-      const showPrices = pdfType === 'cobranca';
-      const showCustomerDetails = pdfType !== 'conferencia';
       
-      const pdfTitles: Record<string, string> = {
+      const pdfFileNames: Record<string, string> = {
         separacao: 'SEPARACAO',
-        cobranca: 'ORCAMENTO',
+        cobranca: 'COBRANCA',
         conferencia: 'CONFERENCIA'
       };
 
       const doc = new PDFDocument({ margin: 40, size: 'A4' });
       
-      const fileName = `${pdfTitles[pdfType] || 'PDF'}_Lote_${new Date().toISOString().slice(0,10)}.pdf`;
+      const fileName = `${pdfFileNames[pdfType] || 'PDF'}_Lote_${new Date().toISOString().slice(0,10)}.pdf`;
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       doc.pipe(res);
@@ -1285,184 +1301,328 @@ export async function registerRoutes(
         
         if (!orderDetails) continue;
         
-        // Customers can only see their own orders
         if (user?.role === 'customer' && orderDetails.order.userId !== userId) {
           continue;
         }
 
         const { order, items, customer } = orderDetails;
 
-        // Add new page for orders after the first
         if (i > 0) {
           doc.addPage();
         }
 
-        // Header
-        doc.fontSize(16).font('Helvetica-Bold').text('LOJAMADRUGADAO SAO PAULO', { align: 'center' });
-        doc.fontSize(12).font('Helvetica').text('11 99284-5596', { align: 'center' });
-        doc.moveDown(0.5);
-        doc.fontSize(14).font('Helvetica-Bold').text(`${pdfTitles[pdfType] || 'ORCAMENTO'} N. ${order.orderNumber}`, { align: 'center' });
-        doc.moveDown();
+        // ========== PDF DE SEPARACAO ==========
+        if (pdfType === 'separacao') {
+          drawPdfHeader(doc, pdfType, order.orderNumber);
+          
+          // Info basica
+          doc.fontSize(10).font('Helvetica');
+          doc.text(`Cliente: ${customer?.tradingName || customer?.company || `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || '-'}`, 40);
+          doc.text(`Data do Pedido: ${new Date(order.createdAt).toLocaleDateString('pt-BR')}`);
+          if (order.notes) {
+            doc.moveDown(0.3);
+            doc.font('Helvetica-Bold').text('Obs: ', { continued: true });
+            doc.font('Helvetica').text(order.notes);
+          }
+          doc.moveDown();
 
-        // Customer Info
-        if (showCustomerDetails && customer) {
-          doc.fontSize(10).font('Helvetica-Bold').text('DADOS DO CLIENTE');
+          // Tabela de itens
+          doc.font('Helvetica-Bold').fontSize(10);
           doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
           doc.moveDown(0.3);
 
-          doc.font('Helvetica');
-          const col1X = 40;
-          const col2X = 300;
+          const tableTop = doc.y;
+          const colCheck = 40;
+          const colCode = 70;
+          const colProduct = 130;
+          const colQty = 480;
 
-          let y = doc.y;
-          doc.text(`Cliente: ${customer.firstName || ''} ${customer.lastName || ''}`, col1X, y);
-          if (customer.company) {
-            doc.text(`Razao Social: ${customer.company}`, col2X, y);
+          doc.text('OK', colCheck, tableTop);
+          doc.text('SKU', colCode, tableTop);
+          doc.text('Produto', colProduct, tableTop);
+          doc.text('QTD', colQty, tableTop);
+
+          doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
+          doc.moveDown(0.5);
+
+          doc.font('Helvetica').fontSize(9);
+          let totalQty = 0;
+
+          for (const item of items) {
+            totalQty += item.quantity;
+
+            if (doc.y > 700) {
+              doc.addPage();
+            }
+
+            const rowY = doc.y;
+
+            // Checkbox grande
+            doc.rect(colCheck, rowY, 15, 15).stroke();
+            
+            doc.text(item.product?.sku || '-', colCode, rowY + 3, { width: 55 });
+            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY + 3, { width: 340 });
+            
+            // Quantidade em fonte grande e destacada
+            doc.font('Helvetica-Bold').fontSize(14);
+            doc.text(item.quantity.toString(), colQty, rowY);
+            doc.font('Helvetica').fontSize(9);
+
+            doc.y = rowY + 22;
           }
 
-          y = doc.y + 5;
-          if (customer.tradingName) {
-            doc.text(`Nome Fantasia: ${customer.tradingName}`, col1X, y);
-          }
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+          doc.moveDown();
+
+          doc.font('Helvetica-Bold').fontSize(11);
+          doc.text(`TOTAL DE ITENS: ${totalQty}`);
           
-          y = doc.y + 5;
-          if (customer.personType === 'juridica' && customer.cnpj) {
-            doc.text(`CNPJ: ${customer.cnpj}`, col1X, y);
-          } else if (customer.cpf) {
-            doc.text(`CPF: ${customer.cpf}`, col1X, y);
-          }
-          if (customer.stateRegistration) {
-            doc.text(`Inscricao Estadual: ${customer.stateRegistration}`, col2X, y);
-          }
-
-          y = doc.y + 5;
-          let addressLine = '';
-          if (customer.address) {
-            addressLine = customer.address;
-            if (customer.addressNumber) addressLine += `, ${customer.addressNumber}`;
-            if (customer.complement) addressLine += ` - ${customer.complement}`;
-          }
-          if (addressLine) {
-            doc.text(`Endereco: ${addressLine}`, col1X, y);
-          }
-
-          y = doc.y + 5;
-          if (customer.neighborhood) {
-            doc.text(`Bairro: ${customer.neighborhood}`, col1X, y);
-          }
-          if (customer.cep) {
-            doc.text(`CEP: ${customer.cep}`, col2X, y);
-          }
-
-          y = doc.y + 5;
-          if (customer.city) {
-            doc.text(`Cidade: ${customer.city}`, col1X, y);
-          }
-          if (customer.state) {
-            doc.text(`Estado: ${customer.state}`, col2X, y);
-          }
-
-          y = doc.y + 5;
-          if (customer.phone) {
-            doc.text(`Telefone: ${customer.phone}`, col1X, y);
-          }
-          if (customer.email) {
-            doc.text(`E-mail: ${customer.email}`, col2X, y);
-          }
-
-          doc.moveDown(1.5);
+          // Rodape de separacao
+          doc.moveDown(3);
+          doc.fontSize(10).font('Helvetica');
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+          doc.moveDown(0.5);
+          doc.text('Separado por: ________________________________     Data: ____/____/________');
         }
 
-        // Items Table Header
-        doc.font('Helvetica-Bold').fontSize(10);
-        doc.text('ITENS DO PEDIDO');
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-        doc.moveDown(0.3);
+        // ========== PDF DE COBRANCA ==========
+        else if (pdfType === 'cobranca') {
+          drawPdfHeader(doc, pdfType, order.orderNumber);
 
-        const tableTop = doc.y;
-        const colImg = 40;
-        const colCode = 90;
-        const colProduct = 140;
-        const colQty = showPrices ? 350 : 450;
-        const colPrice = 410;
-        const colSubtotal = 480;
-        const imgSize = 40;
+          // Dados do cliente completos
+          if (customer) {
+            doc.fontSize(10).font('Helvetica-Bold').text('DADOS DO CLIENTE');
+            doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+            doc.moveDown(0.3);
 
-        doc.text('Img', colImg, tableTop);
-        doc.text('#', colCode, tableTop);
-        doc.text('Produto', colProduct, tableTop);
-        doc.text('Qtde.', colQty, tableTop);
-        if (showPrices) {
+            doc.font('Helvetica');
+            const col1X = 40;
+            const col2X = 300;
+
+            let y = doc.y;
+            const clientName = customer.tradingName || customer.company || `${customer.firstName || ''} ${customer.lastName || ''}`.trim();
+            doc.text(`Cliente: ${clientName}`, col1X, y);
+            
+            y = doc.y + 3;
+            if (customer.personType === 'juridica' && customer.cnpj) {
+              doc.text(`CNPJ: ${customer.cnpj}`, col1X, y);
+            } else if (customer.cpf) {
+              doc.text(`CPF: ${customer.cpf}`, col1X, y);
+            }
+            if (customer.stateRegistration) {
+              doc.text(`IE: ${customer.stateRegistration}`, col2X, y);
+            }
+
+            y = doc.y + 3;
+            let addressLine = '';
+            if (customer.address) {
+              addressLine = customer.address;
+              if (customer.addressNumber) addressLine += `, ${customer.addressNumber}`;
+              if (customer.complement) addressLine += ` - ${customer.complement}`;
+              if (customer.neighborhood) addressLine += ` - ${customer.neighborhood}`;
+            }
+            if (addressLine) {
+              doc.text(`Endereco: ${addressLine}`, col1X, y);
+            }
+
+            y = doc.y + 3;
+            if (customer.city || customer.state) {
+              doc.text(`${customer.city || ''} - ${customer.state || ''}`, col1X, y);
+            }
+            if (customer.cep) {
+              doc.text(`CEP: ${customer.cep}`, col2X, y);
+            }
+
+            y = doc.y + 3;
+            if (customer.phone) {
+              doc.text(`Tel: ${customer.phone}`, col1X, y);
+            }
+            if (customer.email) {
+              doc.text(`Email: ${customer.email}`, col2X, y);
+            }
+
+            doc.moveDown();
+          }
+
+          // Tabela de itens com precos
+          doc.font('Helvetica-Bold').fontSize(10);
+          doc.text('ITENS DO PEDIDO');
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+          doc.moveDown(0.3);
+
+          const tableTop = doc.y;
+          const colCode = 40;
+          const colProduct = 90;
+          const colQty = 350;
+          const colPrice = 410;
+          const colSubtotal = 490;
+
+          doc.text('SKU', colCode, tableTop);
+          doc.text('Produto', colProduct, tableTop);
+          doc.text('Qtd', colQty, tableTop);
           doc.text('Preco', colPrice, tableTop);
           doc.text('Subtotal', colSubtotal, tableTop);
-        }
 
-        doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
-        doc.moveDown(0.5);
+          doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
+          doc.moveDown(0.5);
 
-        // Items
-        doc.font('Helvetica').fontSize(9);
-        let totalQty = 0;
+          doc.font('Helvetica').fontSize(9);
+          let totalQty = 0;
 
-        for (const item of items) {
-          const itemSubtotal = parseFloat(item.price) * item.quantity;
-          totalQty += item.quantity;
+          for (const item of items) {
+            const itemSubtotal = parseFloat(item.price) * item.quantity;
+            totalQty += item.quantity;
 
-          if (doc.y > 700) {
-            doc.addPage();
+            if (doc.y > 680) {
+              doc.addPage();
+            }
+
+            const rowY = doc.y;
+
+            doc.text(item.product?.sku || '-', colCode, rowY, { width: 45 });
+            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY, { width: 255 });
+            doc.text(item.quantity.toString(), colQty, rowY);
+            doc.text(`R$ ${parseFloat(item.price).toFixed(2)}`, colPrice, rowY);
+            doc.text(`R$ ${itemSubtotal.toFixed(2)}`, colSubtotal, rowY);
+
+            doc.y = rowY + 15;
           }
 
-          const rowY = doc.y;
-
-          if (item.product?.image) {
-            try {
-              const imageBuffer = await fetchImageBuffer(item.product.image);
-              if (imageBuffer) {
-                doc.image(imageBuffer, colImg, rowY, { width: imgSize, height: imgSize, fit: [imgSize, imgSize] });
-              }
-            } catch (imgErr) {}
-          }
-
-          doc.text(item.product?.sku || '-', colCode, rowY + 15, { width: 45 });
-          doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY + 15, { width: showPrices ? 205 : 305 });
-          doc.text(item.quantity.toString(), colQty, rowY + 15);
-          if (showPrices) {
-            doc.text(`R$ ${parseFloat(item.price).toFixed(2)}`, colPrice, rowY + 15);
-            doc.text(`R$ ${itemSubtotal.toFixed(2)}`, colSubtotal, rowY + 15);
-          }
-
-          doc.y = rowY + imgSize + 5;
-        }
-
-        doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
-        doc.moveDown();
-
-        // Totals
-        doc.font('Helvetica-Bold').fontSize(10);
-        doc.text(`Qtde. Total: ${totalQty}`, 40, doc.y);
-        
-        if (showPrices) {
-          const totalsX = 380;
-          doc.moveDown(0.3);
-          doc.text(`Total de Descontos: R$ 0,00`, totalsX);
-          doc.moveDown(0.3);
-          doc.text(`Valor do frete: R$ 0,00`, totalsX);
-          doc.moveDown(0.3);
-          doc.fontSize(12).text(`Valor Total: R$ ${parseFloat(order.total).toFixed(2)}`, totalsX);
-        }
-
-        doc.moveDown(2);
-
-        // Footer
-        doc.fontSize(9).font('Helvetica');
-        const footerY = doc.y;
-        doc.text(`Data de Emissao: ${new Date(order.createdAt).toLocaleDateString('pt-BR')}`, 40, footerY);
-        doc.text(`Status: ${order.status}`, 300, footerY);
-
-        if (order.notes) {
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
           doc.moveDown();
-          doc.font('Helvetica-Bold').text('Observacoes:');
-          doc.font('Helvetica').text(order.notes);
+
+          // Box de totais destacado
+          doc.font('Helvetica').fontSize(10);
+          doc.text(`Quantidade Total: ${totalQty} itens`, 40);
+          doc.moveDown(0.5);
+
+          const boxX = 350;
+          const boxY = doc.y;
+          const boxWidth = 205;
+          const boxHeight = 70;
+          
+          doc.rect(boxX, boxY, boxWidth, boxHeight).stroke();
+          
+          doc.text(`Subtotal:`, boxX + 10, boxY + 8);
+          doc.text(`R$ ${parseFloat(order.subtotal).toFixed(2)}`, boxX + 120, boxY + 8);
+          
+          doc.text(`Frete:`, boxX + 10, boxY + 23);
+          doc.text(`R$ ${parseFloat(order.shippingCost || '0').toFixed(2)}`, boxX + 120, boxY + 23);
+          
+          doc.moveTo(boxX + 5, boxY + 40).lineTo(boxX + boxWidth - 5, boxY + 40).stroke();
+          
+          doc.font('Helvetica-Bold').fontSize(12);
+          doc.text(`TOTAL:`, boxX + 10, boxY + 48);
+          doc.text(`R$ ${parseFloat(order.total).toFixed(2)}`, boxX + 100, boxY + 48);
+
+          doc.y = boxY + boxHeight + 15;
+
+          // Forma de pagamento
+          if (order.paymentMethod || order.paymentNotes) {
+            doc.font('Helvetica-Bold').fontSize(10).text('FORMA DE PAGAMENTO');
+            doc.font('Helvetica').fontSize(9);
+            if (order.paymentMethod) doc.text(order.paymentMethod);
+            if (order.paymentNotes) doc.text(order.paymentNotes);
+            doc.moveDown();
+          }
+
+          // Observacoes
+          if (order.notes) {
+            doc.font('Helvetica-Bold').fontSize(10).text('OBSERVACOES');
+            doc.font('Helvetica').fontSize(9).text(order.notes);
+            doc.moveDown();
+          }
+
+          // Rodape
+          doc.moveDown();
+          doc.fontSize(8).font('Helvetica');
+          doc.text(`Emissao: ${new Date(order.createdAt).toLocaleDateString('pt-BR')} | Este documento nao e fiscal.`, { align: 'center' });
+        }
+
+        // ========== PDF DE CONFERENCIA ==========
+        else if (pdfType === 'conferencia') {
+          drawPdfHeader(doc, pdfType, order.orderNumber);
+          
+          // Info basica
+          doc.fontSize(10).font('Helvetica');
+          doc.text(`Cliente: ${customer?.tradingName || customer?.company || `${customer?.firstName || ''} ${customer?.lastName || ''}`.trim() || '-'}`);
+          doc.text(`Data do Pedido: ${new Date(order.createdAt).toLocaleDateString('pt-BR')}`);
+          doc.moveDown();
+
+          // Tabela com 3 colunas
+          doc.font('Helvetica-Bold').fontSize(10);
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+          doc.moveDown(0.3);
+
+          const tableTop = doc.y;
+          const colCode = 40;
+          const colProduct = 90;
+          const colQtyPedido = 380;
+          const colQtyConferido = 480;
+
+          doc.text('SKU', colCode, tableTop);
+          doc.text('Produto', colProduct, tableTop);
+          doc.text('Qtd Pedido', colQtyPedido, tableTop);
+          doc.text('Conferido', colQtyConferido, tableTop);
+
+          doc.moveTo(40, doc.y + 3).lineTo(555, doc.y + 3).stroke();
+          doc.moveDown(0.5);
+
+          doc.font('Helvetica').fontSize(9);
+          let totalQty = 0;
+
+          for (const item of items) {
+            totalQty += item.quantity;
+
+            if (doc.y > 650) {
+              doc.addPage();
+            }
+
+            const rowY = doc.y;
+
+            doc.text(item.product?.sku || '-', colCode, rowY, { width: 45 });
+            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY, { width: 280 });
+            
+            doc.font('Helvetica-Bold').fontSize(11);
+            doc.text(item.quantity.toString(), colQtyPedido + 20, rowY);
+            doc.font('Helvetica').fontSize(9);
+            
+            // Campo vazio para preencher manualmente
+            doc.rect(colQtyConferido, rowY - 2, 40, 16).stroke();
+
+            doc.y = rowY + 22;
+          }
+
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+          doc.moveDown();
+
+          doc.font('Helvetica-Bold').fontSize(10);
+          doc.text(`TOTAL DE ITENS: ${totalQty}`);
+
+          // Observacoes do pedido
+          if (order.notes) {
+            doc.moveDown();
+            doc.font('Helvetica-Bold').text('Observacoes do Pedido:');
+            doc.font('Helvetica').fontSize(9).text(order.notes);
+          }
+
+          // Area de conferencia
+          doc.moveDown(2);
+          doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+          doc.moveDown(0.5);
+
+          // Checkbox de conferencia
+          doc.rect(40, doc.y, 15, 15).stroke();
+          doc.font('Helvetica').fontSize(10).text('  Pedido conferido sem divergencias', 60, doc.y + 2);
+          
+          doc.moveDown(1.5);
+          doc.text('Conferido por: ________________________________');
+          doc.moveDown(0.5);
+          doc.text('Data/Hora: ____/____/________ - ____:____');
+          
+          doc.moveDown(1.5);
+          doc.fontSize(8).font('Helvetica-Bold');
+          doc.text('ATENCAO: Somente apos a conferencia o pedido pode ser enviado.', { align: 'center' });
         }
       }
 
