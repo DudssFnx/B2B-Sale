@@ -34,7 +34,11 @@ let objectStorageClient: Client | null = null;
 
 async function getObjectStorage(): Promise<Client> {
   if (!objectStorageClient) {
-    objectStorageClient = new Client();
+    const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    if (!bucketId) {
+      throw new Error("Object storage not configured. DEFAULT_OBJECT_STORAGE_BUCKET_ID is missing.");
+    }
+    objectStorageClient = new Client({ bucketId });
   }
   return objectStorageClient;
 }
