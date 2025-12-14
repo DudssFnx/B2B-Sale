@@ -279,15 +279,77 @@ export async function registerRoutes(
     }
   });
 
-  // ========== PRODUCTS ==========
-  app.get('/api/products', isAuthenticated, isApproved, async (req, res) => {
+  // ========== PUBLIC CATALOG (no auth required) ==========
+  // Retail markup: 40% on top of base price
+  const RETAIL_MARKUP = 0.40;
+  
+  app.get('/api/public/products', async (req, res) => {
     try {
       const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
       const search = req.query.search as string | undefined;
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const result = await storage.getProducts({ categoryId, search, page, limit });
-      res.json(result);
+      
+      // Apply retail markup (40%) to all prices for public view
+      const productsWithRetailPrice = result.products.map(p => ({
+        ...p,
+        price: (parseFloat(p.price) * (1 + RETAIL_MARKUP)).toFixed(2),
+        basePrice: p.price, // Keep base price for reference (hidden from public)
+      }));
+      
+      res.json({
+        ...result,
+        products: productsWithRetailPrice.map(({ basePrice, ...rest }) => rest), // Remove basePrice from response
+      });
+    } catch (error) {
+      console.error("Error fetching public products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.get('/api/public/categories', async (req, res) => {
+    try {
+      const categories = await storage.getCategories();
+      // Filter out categories hidden from varejo
+      const publicCategories = categories.filter(c => !c.hideFromVarejo);
+      res.json(publicCategories);
+    } catch (error) {
+      console.error("Error fetching public categories:", error);
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  // ========== PRODUCTS ==========
+  app.get('/api/products', isAuthenticated, isApproved, async (req: any, res) => {
+    try {
+      const categoryId = req.query.categoryId ? parseInt(req.query.categoryId as string) : undefined;
+      const search = req.query.search as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      const result = await storage.getProducts({ categoryId, search, page, limit });
+      
+      // Get user to check customer type
+      const userId = req.user?.claims?.sub;
+      const user = userId ? await storage.getUser(userId) : null;
+      
+      // Atacado customers see base price, varejo customers see price + 40%
+      const isAtacado = user?.customerType === 'atacado' || user?.role === 'admin' || user?.role === 'sales';
+      
+      if (isAtacado) {
+        // Atacado: show base price (no markup)
+        res.json(result);
+      } else {
+        // Varejo: apply 40% markup
+        const productsWithRetailPrice = result.products.map(p => ({
+          ...p,
+          price: (parseFloat(p.price) * (1 + RETAIL_MARKUP)).toFixed(2),
+        }));
+        res.json({
+          ...result,
+          products: productsWithRetailPrice,
+        });
+      }
     } catch (error) {
       console.error("Error fetching products:", error);
       res.status(500).json({ message: "Failed to fetch products" });

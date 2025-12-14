@@ -29,6 +29,7 @@ import CouponsPage from "@/pages/coupons";
 import OrderDetailsPage from "@/pages/order-details";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import ProductAnalyticsPage from "@/pages/product-analytics";
+import PublicCatalogPage from "@/pages/public-catalog";
 
 function AuthenticatedApp() {
   const { user, logout, isAdmin, isApproved } = useAuth();
@@ -126,6 +127,7 @@ function AppContent() {
       <Switch>
         <Route path="/register" component={RegisterPage} />
         <Route path="/login" component={LoginPage} />
+        <Route path="/catalog" component={PublicCatalogPage} />
         <Route component={LandingPage} />
       </Switch>
     );
