@@ -50,7 +50,7 @@ export default function LandingPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const { addItem, totalItems } = useCart();
+  const { addItem, itemCount, openCart } = useCart();
   const { toast } = useToast();
 
   const { data: categoriesData = [], isLoading: categoriesLoading } = useQuery<Category[]>({
@@ -186,14 +186,14 @@ export default function LandingPage() {
               <Button 
                 variant="ghost"
                 size="icon"
-                onClick={() => setLocation("/login")}
+                onClick={openCart}
                 className="text-white hover:bg-zinc-800 relative"
                 data-testid="button-cart"
               >
                 <ShoppingCart className="h-5 w-5" />
-                {totalItems > 0 && (
+                {itemCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-medium">
-                    {totalItems > 99 ? "99+" : totalItems}
+                    {itemCount > 99 ? "99+" : itemCount}
                   </span>
                 )}
               </Button>

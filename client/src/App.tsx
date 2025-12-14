@@ -131,6 +131,7 @@ function AppContent() {
           <Route path="/catalogo" component={PublicCatalogPage} />
           <Route component={LandingPage} />
         </Switch>
+        <CartDrawer />
       </CartProvider>
     );
   }
