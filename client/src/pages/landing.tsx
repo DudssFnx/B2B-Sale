@@ -33,6 +33,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Product as SchemaProduct, Category } from "@shared/schema";
 import { useCart } from "@/contexts/CartContext";
+import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/image_1765659931449.png";
 import bannerImage1 from "@assets/image_1765676126936.png";
 import bannerImage2 from "@assets/image_1765676145067.png";
@@ -47,7 +48,9 @@ interface ProductsResponse {
 export default function LandingPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const { totalItems } = useCart();
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const { addItem, totalItems } = useCart();
+  const { toast } = useToast();
 
   const { data: categoriesData = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ['/api/public/categories'],
@@ -100,6 +103,44 @@ export default function LandingPage() {
     if (searchQuery.trim()) {
       setLocation(`/catalogo?search=${encodeURIComponent(searchQuery)}`);
     }
+  };
+
+  const getQuantity = (productId: number) => quantities[productId] ?? 0;
+
+  const setQuantity = (productId: number, qty: number) => {
+    if (qty < 0) qty = 0;
+    if (qty > 999) qty = 999;
+    setQuantities(prev => ({ ...prev, [productId]: qty }));
+  };
+
+  const handleAddToCart = (product: SchemaProduct) => {
+    const qty = getQuantity(product.id);
+    if (qty <= 0) {
+      toast({
+        title: "Informe a quantidade",
+        description: "Digite a quantidade desejada",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const price = typeof product.price === 'string' ? parseFloat(product.price) : product.price;
+    
+    addItem({
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      price: price,
+      quantity: qty,
+      image: product.image || undefined,
+    });
+
+    toast({
+      title: "Adicionado ao carrinho",
+      description: `${qty}x ${product.name}`,
+    });
+
+    setQuantities(prev => ({ ...prev, [product.id]: 0 }));
   };
 
   return (
@@ -456,8 +497,7 @@ export default function LandingPage() {
               {newProductsData.map(product => (
                 <Card 
                   key={product.id}
-                  className="overflow-hidden group hover-elevate transition-all duration-200 cursor-pointer ring-2 ring-orange-500/20"
-                  onClick={() => setLocation("/catalogo")}
+                  className="overflow-hidden group hover-elevate transition-all duration-200 ring-2 ring-orange-500/20"
                   data-testid={`card-new-product-${product.id}`}
                 >
                   <div className="aspect-square bg-muted/30 flex items-center justify-center relative overflow-hidden">
@@ -475,6 +515,11 @@ export default function LandingPage() {
                         Novo
                       </Badge>
                     </div>
+                    {product.stock === 0 && (
+                      <div className="absolute inset-0 bg-background/80 flex items-center justify-center backdrop-blur-sm">
+                        <Badge variant="destructive">Indisponivel</Badge>
+                      </div>
+                    )}
                     {product.brand && (
                       <div className="absolute top-1.5 left-1.5">
                         <Badge variant="secondary" className="text-xs font-medium bg-background/90 backdrop-blur-sm">
@@ -490,9 +535,33 @@ export default function LandingPage() {
                     <h3 className="font-medium text-xs line-clamp-2 min-h-[2rem] leading-tight mb-1">
                       {product.name}
                     </h3>
-                    <p className="text-sm font-bold text-primary">
+                    <p className="text-sm font-bold text-orange-600 dark:text-orange-500 mb-2">
                       {formatPrice(product.price)}
                     </p>
+                    {product.stock > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          max="999"
+                          value={getQuantity(product.id)}
+                          onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 0)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-8 w-14 text-center text-sm"
+                          data-testid={`input-qty-new-${product.id}`}
+                        />
+                        <Button
+                          className="flex-1 bg-orange-500 hover:bg-orange-600 text-white h-8 font-semibold text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCart(product);
+                          }}
+                          data-testid={`button-add-cart-new-${product.id}`}
+                        >
+                          COMPRAR
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -535,8 +604,7 @@ export default function LandingPage() {
             {productsData.map(product => (
               <Card 
                 key={product.id}
-                className="overflow-hidden group hover-elevate transition-all duration-200 cursor-pointer"
-                onClick={() => setLocation("/catalogo")}
+                className="overflow-hidden group hover-elevate transition-all duration-200"
                 data-testid={`card-product-${product.id}`}
               >
                 <div className="aspect-square bg-muted/30 flex items-center justify-center relative overflow-hidden">
@@ -569,13 +637,32 @@ export default function LandingPage() {
                   <h3 className="font-medium text-xs line-clamp-2 min-h-[2rem] leading-tight mb-1">
                     {product.name}
                   </h3>
-                  <p className="text-sm font-bold text-primary" data-testid={`text-price-${product.id}`}>
+                  <p className="text-sm font-bold text-orange-600 dark:text-orange-500 mb-2" data-testid={`text-price-${product.id}`}>
                     {formatPrice(product.price)}
                   </p>
-                  {product.categoryId && categoryMap[product.categoryId] && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {categoryMap[product.categoryId]}
-                    </p>
+                  {product.stock > 0 && (
+                    <div className="flex items-center gap-1">
+                      <Input
+                        type="number"
+                        min="0"
+                        max="999"
+                        value={getQuantity(product.id)}
+                        onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 0)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-8 w-14 text-center text-sm"
+                        data-testid={`input-qty-${product.id}`}
+                      />
+                      <Button
+                        className="flex-1 bg-orange-500 hover:bg-orange-600 text-white h-8 font-semibold text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToCart(product);
+                        }}
+                        data-testid={`button-add-cart-${product.id}`}
+                      >
+                        COMPRAR
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
