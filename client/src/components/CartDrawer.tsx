@@ -2,14 +2,27 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from "@/com
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { useCart } from "@/contexts/CartContext";
-import { Minus, Plus, Trash2, Package, ShoppingCart, Loader2 } from "lucide-react";
+import { Minus, Plus, Trash2, Package, ShoppingCart, Loader2, ArrowRight } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
-export function CartDrawer() {
+interface CartDrawerProps {
+  isAuthenticated?: boolean;
+}
+
+export function CartDrawer({ isAuthenticated = false }: CartDrawerProps) {
   const { items, isOpen, closeCart, updateQuantity, removeItem, total, clearCart } = useCart();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(price);
+  };
 
   const createOrderMutation = useMutation({
     mutationFn: async () => {
@@ -42,6 +55,11 @@ export function CartDrawer() {
     createOrderMutation.mutate();
   };
 
+  const handleContinueCheckout = () => {
+    closeCart();
+    setLocation("/checkout");
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && closeCart()}>
       <SheetContent className="flex flex-col w-full sm:max-w-lg">
@@ -55,8 +73,8 @@ export function CartDrawer() {
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
             <Package className="h-16 w-16 text-muted-foreground/50 mb-4" />
-            <p className="text-lg font-medium">Seu carrinho está vazio</p>
-            <p className="text-sm text-muted-foreground mt-1">Adicione produtos para gerar um pedido</p>
+            <p className="text-lg font-medium">Seu carrinho esta vazio</p>
+            <p className="text-sm text-muted-foreground mt-1">Adicione produtos para continuar</p>
           </div>
         ) : (
           <>
@@ -77,7 +95,7 @@ export function CartDrawer() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm line-clamp-1">{item.name}</p>
                     <p className="text-xs text-muted-foreground">{item.sku}</p>
-                    <p className="text-sm font-semibold mt-1">${item.price.toFixed(2)}</p>
+                    <p className="text-sm font-semibold mt-1">{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <Button
@@ -116,23 +134,34 @@ export function CartDrawer() {
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-lg font-semibold">Total</span>
-                <span className="text-2xl font-bold" data-testid="text-cart-total">
-                  ${total.toFixed(2)}
+                <span className="text-2xl font-bold text-orange-600 dark:text-orange-500" data-testid="text-cart-total">
+                  {formatPrice(total)}
                 </span>
               </div>
               <SheetFooter className="gap-2 sm:gap-2">
                 <Button variant="outline" onClick={clearCart} className="flex-1" data-testid="button-clear-cart">
-                  Limpar Carrinho
+                  Limpar
                 </Button>
-                <Button 
-                  onClick={handleGenerateOrder} 
-                  className="flex-1" 
-                  disabled={createOrderMutation.isPending}
-                  data-testid="button-generate-order"
-                >
-                  {createOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Gerar Pedido
-                </Button>
+                {isAuthenticated ? (
+                  <Button 
+                    onClick={handleGenerateOrder} 
+                    className="flex-1 bg-orange-500 hover:bg-orange-600" 
+                    disabled={createOrderMutation.isPending}
+                    data-testid="button-generate-order"
+                  >
+                    {createOrderMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                    Gerar Pedido
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleContinueCheckout} 
+                    className="flex-1 bg-orange-500 hover:bg-orange-600"
+                    data-testid="button-continue-checkout"
+                  >
+                    Continuar
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
               </SheetFooter>
             </div>
           </>

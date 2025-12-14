@@ -30,6 +30,7 @@ import OrderDetailsPage from "@/pages/order-details";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import ProductAnalyticsPage from "@/pages/product-analytics";
 import PublicCatalogPage from "@/pages/public-catalog";
+import CheckoutPage from "@/pages/checkout";
 
 function AuthenticatedApp() {
   const { user, logout, isAdmin, isApproved } = useAuth();
@@ -105,7 +106,7 @@ function AuthenticatedApp() {
             </Switch>
           </main>
         </div>
-        <CartDrawer />
+        <CartDrawer isAuthenticated={true} />
       </div>
     </SidebarProvider>
   );
@@ -129,9 +130,10 @@ function AppContent() {
           <Route path="/register" component={RegisterPage} />
           <Route path="/login" component={LoginPage} />
           <Route path="/catalogo" component={PublicCatalogPage} />
+          <Route path="/checkout" component={CheckoutPage} />
           <Route component={LandingPage} />
         </Switch>
-        <CartDrawer />
+        <CartDrawer isAuthenticated={false} />
       </CartProvider>
     );
   }
