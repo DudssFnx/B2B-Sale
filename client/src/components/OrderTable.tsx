@@ -170,37 +170,6 @@ export function OrderTable({
                       <Eye className="h-4 w-4" />
                     </Button>
                   </Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        data-testid={`button-order-menu-${order.id}`}
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onEditOrder?.(order)}>
-                        Editar Pedido
-                      </DropdownMenuItem>
-                      {order.status === "PEDIDO_GERADO" && (
-                        <DropdownMenuItem 
-                          onClick={() => onInvoice ? onInvoice(order) : onUpdateStatus?.(order, "PEDIDO_FATURADO")}
-                          className="text-foreground"
-                          data-testid={`button-invoice-${order.id}`}
-                        >
-                          Finalizar Pedido
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem 
-                        onClick={() => onUpdateStatus?.(order, "PEDIDO_CANCELADO")}
-                        className="text-destructive"
-                      >
-                        Cancelar
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </div>
               </TableCell>
             </TableRow>
