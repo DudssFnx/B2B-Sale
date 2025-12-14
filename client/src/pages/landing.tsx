@@ -30,8 +30,8 @@ import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Product as SchemaProduct, Category } from "@shared/schema";
 import logoImage from "@assets/image_1765659931449.png";
-import bannerImage1 from "@assets/image_1765675881591.png";
-import bannerImage2 from "@assets/image_1765676031320.png";
+import bannerImage1 from "@assets/image_1765676126936.png";
+import bannerImage2 from "@assets/image_1765676145067.png";
 
 interface ProductsResponse {
   products: SchemaProduct[];
@@ -216,31 +216,52 @@ export default function LandingPage() {
               </div>
             </CarouselItem>
             <CarouselItem>
-              <div className="relative aspect-[21/9] md:aspect-[3/1] w-full overflow-hidden">
-                <img 
-                  src={bannerImage1} 
-                  alt="Atacado" 
-                  className="w-full h-full object-cover"
-                  data-testid="img-banner-3"
-                />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
+              <div className="relative aspect-[21/9] md:aspect-[3/1] w-full overflow-hidden bg-gradient-to-r from-zinc-900 to-zinc-800">
+                <div className="absolute inset-0 flex items-center">
                   <div className="container mx-auto px-4">
-                    <div className="max-w-lg">
-                      <h2 className="text-2xl md:text-4xl font-bold text-white mb-2">
-                        Precos de Atacado
-                      </h2>
-                      <p className="text-white/80 text-sm md:text-base mb-4">
-                        Cadastre-se e tenha acesso a precos exclusivos
-                      </p>
-                      <Button 
-                        size="lg"
-                        onClick={() => setLocation("/register")}
-                        className="bg-orange-500 hover:bg-orange-600"
-                        data-testid="button-cadastrar-atacado"
-                      >
-                        <Store className="h-5 w-5 mr-2" />
-                        Solicitar Cadastro
-                      </Button>
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                      <div className="max-w-lg text-center md:text-left">
+                        <h2 className="text-2xl md:text-4xl font-bold text-white mb-2">
+                          Compre no Atacado
+                        </h2>
+                        <p className="text-white/80 text-sm md:text-base mb-4">
+                          Precos exclusivos para revendedores. Cadastre-se e economize ate 40% nos produtos!
+                        </p>
+                        <div className="flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
+                          <Button 
+                            size="lg"
+                            onClick={() => setLocation("/register")}
+                            className="bg-orange-500 hover:bg-orange-600"
+                            data-testid="button-cadastrar-atacado"
+                          >
+                            <Store className="h-5 w-5 mr-2" />
+                            Solicitar Cadastro
+                          </Button>
+                          <Button 
+                            size="lg"
+                            variant="outline"
+                            onClick={() => setLocation("/login")}
+                            className="border-white/30 text-white hover:bg-white/10"
+                            data-testid="button-ja-tenho-conta"
+                          >
+                            Ja tenho conta
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="hidden md:flex items-center gap-4">
+                        <div className="text-center p-4 bg-white/10 rounded-lg">
+                          <p className="text-3xl font-bold text-orange-500">40%</p>
+                          <p className="text-white/80 text-sm">de desconto</p>
+                        </div>
+                        <div className="text-center p-4 bg-white/10 rounded-lg">
+                          <p className="text-3xl font-bold text-orange-500">12x</p>
+                          <p className="text-white/80 text-sm">sem juros</p>
+                        </div>
+                        <div className="text-center p-4 bg-white/10 rounded-lg">
+                          <p className="text-3xl font-bold text-orange-500">Frete</p>
+                          <p className="text-white/80 text-sm">Gratis SP</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
