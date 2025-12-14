@@ -289,7 +289,8 @@ export async function registerRoutes(
       const search = req.query.search as string | undefined;
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
-      const result = await storage.getProducts({ categoryId, search, page, limit });
+      const sort = req.query.sort as string | undefined;
+      const result = await storage.getProducts({ categoryId, search, page, limit, sort });
       
       // Get categories hidden from varejo
       const allCategories = await storage.getCategories();

@@ -29,7 +29,7 @@ export interface IStorage {
   deleteCategory(id: number): Promise<boolean>;
 
   // Products
-  getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
+  getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
   getProduct(id: number): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
@@ -352,7 +352,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Products
-  async getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
+  async getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 50;
     const offset = (page - 1) * limit;
@@ -371,15 +371,17 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    const orderByClause = filters?.sort === 'newest' ? desc(products.createdAt) : products.name;
+
     let productList: Product[];
     let totalResult: { count: number }[];
     
     if (conditions.length > 0) {
       const whereClause = and(...conditions);
-      productList = await db.select().from(products).where(whereClause).orderBy(products.name).limit(limit).offset(offset);
+      productList = await db.select().from(products).where(whereClause).orderBy(orderByClause).limit(limit).offset(offset);
       totalResult = await db.select({ count: count() }).from(products).where(whereClause);
     } else {
-      productList = await db.select().from(products).orderBy(products.name).limit(limit).offset(offset);
+      productList = await db.select().from(products).orderBy(orderByClause).limit(limit).offset(offset);
       totalResult = await db.select({ count: count() }).from(products);
     }
     

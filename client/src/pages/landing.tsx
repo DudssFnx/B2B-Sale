@@ -11,7 +11,8 @@ import {
   Package,
   ChevronRight,
   Loader2,
-  ShoppingBag
+  ShoppingBag,
+  Sparkles
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -39,6 +40,15 @@ export default function LandingPage() {
     },
   });
 
+  const { data: newProductsResponse, isLoading: newProductsLoading } = useQuery<ProductsResponse>({
+    queryKey: ['/api/public/products', 'new'],
+    queryFn: async () => {
+      const res = await fetch('/api/public/products?limit=6&sort=newest');
+      if (!res.ok) throw new Error('Failed to fetch products');
+      return res.json();
+    },
+  });
+
   const { data: productsResponse, isLoading: productsLoading } = useQuery<ProductsResponse>({
     queryKey: ['/api/public/products', 'featured'],
     queryFn: async () => {
@@ -48,6 +58,7 @@ export default function LandingPage() {
     },
   });
 
+  const newProductsData = newProductsResponse?.products || [];
   const productsData = productsResponse?.products || [];
 
   const categoryMap = useMemo(() => {
@@ -198,6 +209,78 @@ export default function LandingPage() {
                 >
                   {category.name}
                 </Button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {newProductsData.length > 0 && (
+        <section className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-orange-500" />
+              <h2 className="text-xl font-bold">Lancamentos</h2>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setLocation("/catalogo")}
+              data-testid="button-ver-lancamentos"
+            >
+              Ver todos
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          
+          {newProductsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {newProductsData.map(product => (
+                <Card 
+                  key={product.id}
+                  className="overflow-hidden group hover-elevate transition-all duration-200 cursor-pointer ring-2 ring-orange-500/20"
+                  onClick={() => setLocation("/catalogo")}
+                  data-testid={`card-new-product-${product.id}`}
+                >
+                  <div className="aspect-square bg-muted/30 flex items-center justify-center relative overflow-hidden">
+                    {product.image ? (
+                      <img
+                        src={product.image}
+                        alt={product.name}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <Package className="h-12 w-12 text-muted-foreground/20" />
+                    )}
+                    <div className="absolute top-1.5 right-1.5">
+                      <Badge className="text-xs font-medium bg-orange-500 text-white">
+                        Novo
+                      </Badge>
+                    </div>
+                    {product.brand && (
+                      <div className="absolute top-1.5 left-1.5">
+                        <Badge variant="secondary" className="text-xs font-medium bg-background/90 backdrop-blur-sm">
+                          {product.brand}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  <CardContent className="p-2">
+                    <p className="text-xs text-muted-foreground mb-0.5 font-mono">
+                      {product.sku}
+                    </p>
+                    <h3 className="font-medium text-xs line-clamp-2 min-h-[2rem] leading-tight mb-1">
+                      {product.name}
+                    </h3>
+                    <p className="text-sm font-bold text-primary">
+                      {formatPrice(product.price)}
+                    </p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
