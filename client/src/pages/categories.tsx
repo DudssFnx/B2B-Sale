@@ -132,10 +132,7 @@ function CategoryDialog({ category, allCategories, open, onOpenChange, onSuccess
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; slug: string; parentId: number | null; hideFromVarejo: boolean }) => {
-      return apiRequest('/api/categories', {
-        method: 'POST',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('POST', '/api/categories', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
@@ -150,10 +147,7 @@ function CategoryDialog({ category, allCategories, open, onOpenChange, onSuccess
 
   const updateMutation = useMutation({
     mutationFn: async (data: { name: string; slug: string; parentId: number | null; hideFromVarejo: boolean }) => {
-      return apiRequest(`/api/categories/${category!.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(data),
-      });
+      return apiRequest('PATCH', `/api/categories/${category!.id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
@@ -602,10 +596,7 @@ export default function CategoriesPage() {
 
   const toggleVarejoMutation = useMutation({
     mutationFn: async (category: Category) => {
-      return apiRequest(`/api/categories/${category.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ hideFromVarejo: !category.hideFromVarejo }),
-      });
+      return apiRequest('PATCH', `/api/categories/${category.id}`, { hideFromVarejo: !category.hideFromVarejo });
     },
     onSuccess: (_, category) => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
