@@ -134,7 +134,7 @@ export function OrderTable({
                     onClick={() => onReserveStock ? onReserveStock(order) : onUpdateStatus?.(order, "PEDIDO_GERADO")}
                     data-testid={`button-separar-${order.id}`}
                   >
-                    SEPARAR
+                    EU SEPAREI PEDIDO
                   </Button>
                 ) : order.status === "PEDIDO_GERADO" ? (
                   <Badge 
