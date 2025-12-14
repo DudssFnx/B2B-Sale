@@ -67,6 +67,82 @@ interface BlingCategory {
 let cachedTokens: BlingTokens | null = null;
 let tokenExpiresAt: number = 0;
 
+// ========== SYNC PROGRESS MANAGEMENT ==========
+export interface SyncProgress {
+  status: 'idle' | 'running' | 'completed' | 'error';
+  phase: string;
+  currentStep: number;
+  totalSteps: number;
+  message: string;
+  created: number;
+  updated: number;
+  errors: number;
+  startTime: number | null;
+  estimatedRemaining: string | null;
+}
+
+let syncProgress: SyncProgress = {
+  status: 'idle',
+  phase: '',
+  currentStep: 0,
+  totalSteps: 0,
+  message: '',
+  created: 0,
+  updated: 0,
+  errors: 0,
+  startTime: null,
+  estimatedRemaining: null,
+};
+
+const progressListeners: Set<(progress: SyncProgress) => void> = new Set();
+
+export function getSyncProgress(): SyncProgress {
+  return { ...syncProgress };
+}
+
+export function subscribeSyncProgress(callback: (progress: SyncProgress) => void): () => void {
+  progressListeners.add(callback);
+  callback(syncProgress);
+  return () => progressListeners.delete(callback);
+}
+
+function updateProgress(updates: Partial<SyncProgress>) {
+  syncProgress = { ...syncProgress, ...updates };
+  
+  if (syncProgress.startTime && syncProgress.currentStep > 0 && syncProgress.totalSteps > 0) {
+    const elapsed = Date.now() - syncProgress.startTime;
+    const avgTimePerStep = elapsed / syncProgress.currentStep;
+    const remaining = avgTimePerStep * (syncProgress.totalSteps - syncProgress.currentStep);
+    
+    if (remaining > 60000) {
+      syncProgress.estimatedRemaining = `${Math.ceil(remaining / 60000)} min`;
+    } else if (remaining > 0) {
+      syncProgress.estimatedRemaining = `${Math.ceil(remaining / 1000)} seg`;
+    } else {
+      syncProgress.estimatedRemaining = null;
+    }
+  }
+  
+  const snapshot = { ...syncProgress };
+  progressListeners.forEach(cb => cb(snapshot));
+}
+
+function resetProgress() {
+  syncProgress = {
+    status: 'idle',
+    phase: '',
+    currentStep: 0,
+    totalSteps: 0,
+    message: '',
+    created: 0,
+    updated: 0,
+    errors: 0,
+    startTime: null,
+    estimatedRemaining: null,
+  };
+  progressListeners.forEach(cb => cb(syncProgress));
+}
+
 function getBasicAuthHeader(): string {
   const clientId = process.env.BLING_CLIENT_ID;
   const clientSecret = process.env.BLING_CLIENT_SECRET;
@@ -426,143 +502,224 @@ async function fetchCategoriesWithRetry(): Promise<BlingCategory[]> {
 }
 
 export async function syncProducts(): Promise<{ created: number; updated: number; errors: string[] }> {
+  if (syncProgress.status === 'running') {
+    throw new Error('Sincronização já em andamento');
+  }
+  
   const startTime = Date.now();
   let basicProducts: BlingProductBasic[] = [];
   let page = 1;
   const limit = 100;
   
-  console.log("Fetching product list from Bling (with rate limit handling)...");
-  while (true) {
-    await new Promise(resolve => setTimeout(resolve, 600));
-    const pageProducts = await fetchProductListWithRetry(page, limit);
-    if (pageProducts.length === 0) break;
+  try {
+    updateProgress({
+      status: 'running',
+      phase: 'Buscando lista de produtos',
+      currentStep: 0,
+      totalSteps: 100,
+      message: 'Iniciando sincronização...',
+      created: 0,
+      updated: 0,
+      errors: 0,
+      startTime,
+    });
     
-    for (const p of pageProducts) {
-      if (p.situacao === "A") {
-        basicProducts.push(p);
-      }
-    }
-    console.log(`Page ${page}: ${pageProducts.length} products (${basicProducts.length} active total)`);
-    
-    if (pageProducts.length < limit) break;
-    page++;
-  }
-  
-  console.log(`Found ${basicProducts.length} active products.`);
-
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  console.log("Fetching categories from Bling for mapping...");
-  const blingCategories = await fetchCategoriesWithRetry();
-  const blingCatIdToName: Record<number, string> = {};
-  blingCategories.forEach(bc => {
-    blingCatIdToName[bc.id] = bc.descricao;
-  });
-
-  const existingCategories = await db.select().from(categories);
-  const categoryMap: Record<string, number> = {};
-  const blingIdToCategoryId: Record<number, number> = {};
-  existingCategories.forEach(c => {
-    categoryMap[c.name.toLowerCase()] = c.id;
-    if (c.blingId) {
-      blingIdToCategoryId[c.blingId] = c.id;
-    }
-  });
-  console.log(`Loaded ${Object.keys(categoryMap).length} local categories`);
-
-  console.log(`Fetching product details sequentially (1 req per 600ms = ~1.6 req/s)...`);
-  const productIds = basicProducts.map(p => p.id);
-  const blingProducts = await runWithConcurrency(
-    productIds,
-    async (id) => {
+    console.log("Fetching product list from Bling (with rate limit handling)...");
+    while (true) {
       await new Promise(resolve => setTimeout(resolve, 600));
-      return fetchProductDetailsWithRetry(id);
-    },
-    1,
-    (done, total) => { if (done % 50 === 0) console.log(`Fetched ${done}/${total} product details...`); }
-  );
-  console.log(`Fetched all product details.`);
-
-  let created = 0;
-  let updated = 0;
-  const errors: string[] = [];
-
-  for (let i = 0; i < productIds.length; i++) {
-    const productId = productIds[i];
-    const blingProduct = blingProducts[i];
-    
-    if (!blingProduct) {
-      errors.push(`Product ${productId}: Failed to fetch details`);
-      continue;
-    }
-
-    try {
-      let categoryId: number | null = null;
-      const blingCat = blingProduct.categoria;
-      if (blingCat && blingCat.id) {
-        categoryId = blingIdToCategoryId[blingCat.id] || null;
-        if (!categoryId) {
-          const blingCatName = blingCatIdToName[blingCat.id] || blingCat.descricao;
-          if (blingCatName) {
-            categoryId = categoryMap[blingCatName.toLowerCase()] || null;
-          }
+      const pageProducts = await fetchProductListWithRetry(page, limit);
+      if (pageProducts.length === 0) break;
+      
+      for (const p of pageProducts) {
+        if (p.situacao === "A") {
+          basicProducts.push(p);
         }
       }
-
-      let imageUrl: string | null = null;
-      if (blingProduct.imagens && blingProduct.imagens.length > 0) {
-        const sortedImages = [...blingProduct.imagens].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
-        imageUrl = sortedImages[0]?.linkExterno || sortedImages[0]?.link || null;
-      }
-      if (!imageUrl && blingProduct.midia?.imagens?.externas?.[0]?.link) {
-        imageUrl = blingProduct.midia.imagens.externas[0].link;
-      }
-      if (!imageUrl && blingProduct.midia?.imagens?.internas?.[0]?.link) {
-        imageUrl = blingProduct.midia.imagens.internas[0].link;
-      }
-
-      const description = blingProduct.descricaoComplementar || blingProduct.descricaoCurta || null;
-      const stock = blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
-
-      const productData: InsertProduct = {
-        name: blingProduct.nome,
-        sku: blingProduct.codigo || `BLING-${blingProduct.id}`,
-        categoryId,
-        brand: blingProduct.marca || null,
-        description,
-        price: String(blingProduct.preco || 0),
-        stock,
-        image: imageUrl,
-      };
-
-      const existing = await db.select().from(products).where(eq(products.sku, productData.sku)).limit(1);
-
-      if (existing.length === 0) {
-        await db.insert(products).values(productData);
-        created++;
-      } else {
-        await db.update(products)
-          .set({
-            name: productData.name,
-            categoryId: productData.categoryId,
-            brand: productData.brand,
-            description: productData.description,
-            price: productData.price,
-            stock: productData.stock,
-            image: productData.image,
-          })
-          .where(eq(products.sku, productData.sku));
-        updated++;
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      errors.push(`Product ${productId}: ${message}`);
+      updateProgress({ message: `Página ${page}: ${basicProducts.length} produtos ativos encontrados` });
+      console.log(`Page ${page}: ${pageProducts.length} products (${basicProducts.length} active total)`);
+      
+      if (pageProducts.length < limit) break;
+      page++;
     }
-  }
-  
-  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log(`Sync complete in ${elapsed}s: ${created} created, ${updated} updated, ${errors.length} errors`);
+    
+    console.log(`Found ${basicProducts.length} active products.`);
+    const totalProducts = basicProducts.length;
+    const totalSteps = totalProducts * 2;
+    
+    updateProgress({
+      phase: 'Buscando categorias',
+      totalSteps,
+      message: `${totalProducts} produtos encontrados. Buscando categorias...`,
+    });
 
-  return { created, updated, errors };
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log("Fetching categories from Bling for mapping...");
+    const blingCategories = await fetchCategoriesWithRetry();
+    const blingCatIdToName: Record<number, string> = {};
+    blingCategories.forEach(bc => {
+      blingCatIdToName[bc.id] = bc.descricao;
+    });
+
+    const existingCategories = await db.select().from(categories);
+    const categoryMap: Record<string, number> = {};
+    const blingIdToCategoryId: Record<number, number> = {};
+    existingCategories.forEach(c => {
+      categoryMap[c.name.toLowerCase()] = c.id;
+      if (c.blingId) {
+        blingIdToCategoryId[c.blingId] = c.id;
+      }
+    });
+    console.log(`Loaded ${Object.keys(categoryMap).length} local categories`);
+
+    updateProgress({
+      phase: 'Buscando detalhes dos produtos',
+      message: `Buscando detalhes de ${totalProducts} produtos...`,
+    });
+    
+    console.log(`Fetching product details sequentially (1 req per 600ms = ~1.6 req/s)...`);
+    const productIds = basicProducts.map(p => p.id);
+    let detailsFetched = 0;
+    
+    const blingProducts = await runWithConcurrency(
+      productIds,
+      async (id) => {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        const result = await fetchProductDetailsWithRetry(id);
+        detailsFetched++;
+        if (detailsFetched % 10 === 0 || detailsFetched === totalProducts) {
+          updateProgress({
+            currentStep: detailsFetched,
+            message: `Buscando detalhes: ${detailsFetched}/${totalProducts}`,
+          });
+        }
+        return result;
+      },
+      1,
+      (done, total) => { if (done % 50 === 0) console.log(`Fetched ${done}/${total} product details...`); }
+    );
+    console.log(`Fetched all product details.`);
+
+    updateProgress({
+      phase: 'Salvando produtos',
+      currentStep: totalProducts,
+      message: 'Salvando produtos no banco de dados...',
+    });
+
+    let created = 0;
+    let updated = 0;
+    const errors: string[] = [];
+
+    for (let i = 0; i < productIds.length; i++) {
+      const productId = productIds[i];
+      const blingProduct = blingProducts[i];
+      
+      if (!blingProduct) {
+        errors.push(`Product ${productId}: Failed to fetch details`);
+        updateProgress({ errors: errors.length });
+        continue;
+      }
+
+      try {
+        let categoryId: number | null = null;
+        const blingCat = blingProduct.categoria;
+        if (blingCat && blingCat.id) {
+          categoryId = blingIdToCategoryId[blingCat.id] || null;
+          if (!categoryId) {
+            const blingCatName = blingCatIdToName[blingCat.id] || blingCat.descricao;
+            if (blingCatName) {
+              categoryId = categoryMap[blingCatName.toLowerCase()] || null;
+            }
+          }
+        }
+
+        let imageUrl: string | null = null;
+        if (blingProduct.imagens && blingProduct.imagens.length > 0) {
+          const sortedImages = [...blingProduct.imagens].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+          imageUrl = sortedImages[0]?.linkExterno || sortedImages[0]?.link || null;
+        }
+        if (!imageUrl && blingProduct.midia?.imagens?.externas?.[0]?.link) {
+          imageUrl = blingProduct.midia.imagens.externas[0].link;
+        }
+        if (!imageUrl && blingProduct.midia?.imagens?.internas?.[0]?.link) {
+          imageUrl = blingProduct.midia.imagens.internas[0].link;
+        }
+
+        const description = blingProduct.descricaoComplementar || blingProduct.descricaoCurta || null;
+        const stock = blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
+
+        const productData: InsertProduct = {
+          name: blingProduct.nome,
+          sku: blingProduct.codigo || `BLING-${blingProduct.id}`,
+          categoryId,
+          brand: blingProduct.marca || null,
+          description,
+          price: String(blingProduct.preco || 0),
+          stock,
+          image: imageUrl,
+        };
+
+        const existing = await db.select().from(products).where(eq(products.sku, productData.sku)).limit(1);
+
+        if (existing.length === 0) {
+          await db.insert(products).values(productData);
+          created++;
+        } else {
+          await db.update(products)
+            .set({
+              name: productData.name,
+              categoryId: productData.categoryId,
+              brand: productData.brand,
+              description: productData.description,
+              price: productData.price,
+              stock: productData.stock,
+              image: productData.image,
+            })
+            .where(eq(products.sku, productData.sku));
+          updated++;
+        }
+        
+        if ((i + 1) % 10 === 0 || i === productIds.length - 1) {
+          updateProgress({
+            currentStep: totalProducts + i + 1,
+            created,
+            updated,
+            message: `Salvando: ${i + 1}/${totalProducts} (${created} novos, ${updated} atualizados)`,
+          });
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown error";
+        errors.push(`Product ${productId}: ${message}`);
+        updateProgress({ errors: errors.length });
+      }
+    }
+    
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+    console.log(`Sync complete in ${elapsed}s: ${created} created, ${updated} updated, ${errors.length} errors`);
+
+    updateProgress({
+      status: 'completed',
+      phase: 'Concluído',
+      currentStep: totalSteps,
+      message: `Sincronização concluída em ${elapsed}s`,
+      created,
+      updated,
+      errors: errors.length,
+      estimatedRemaining: null,
+    });
+
+    setTimeout(() => resetProgress(), 30000);
+
+    return { created, updated, errors };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Erro desconhecido';
+    updateProgress({
+      status: 'error',
+      phase: 'Erro',
+      message: `Erro: ${message}`,
+    });
+    setTimeout(() => resetProgress(), 10000);
+    throw error;
+  }
 }
 
 export function isAuthenticated(): boolean {

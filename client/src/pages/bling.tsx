@@ -2,11 +2,12 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, XCircle, RefreshCw, Link as LinkIcon, FolderSync, Package, Unlink } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, CheckCircle, XCircle, RefreshCw, Link as LinkIcon, FolderSync, Package, Unlink, Clock, AlertCircle } from "lucide-react";
 
 interface BlingStatus {
   authenticated: boolean;
@@ -19,9 +20,24 @@ interface SyncResult {
   errors?: string[];
 }
 
+interface SyncProgress {
+  status: 'idle' | 'running' | 'completed' | 'error';
+  phase: string;
+  currentStep: number;
+  totalSteps: number;
+  message: string;
+  created: number;
+  updated: number;
+  errors: number;
+  startTime: number | null;
+  estimatedRemaining: string | null;
+}
+
 export default function BlingPage() {
   const { toast } = useToast();
   const [location] = useLocation();
+  const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
   const { data: status, isLoading } = useQuery<BlingStatus>({
     queryKey: ["/api/bling/status"],
@@ -45,6 +61,38 @@ export default function BlingPage() {
       window.history.replaceState({}, "", "/bling");
     }
   }, [location, toast]);
+
+  useEffect(() => {
+    if (status?.authenticated) {
+      const eventSource = new EventSource("/api/bling/sync/progress", { withCredentials: true });
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        try {
+          const progress: SyncProgress = JSON.parse(event.data);
+          setSyncProgress(progress);
+          
+          if (progress.status === 'completed') {
+            queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+            toast({
+              title: "Sincronização Concluída",
+              description: `${progress.created} criados, ${progress.updated} atualizados${progress.errors > 0 ? `, ${progress.errors} erros` : ''}`,
+            });
+          }
+        } catch (e) {
+          console.error("Error parsing SSE data:", e);
+        }
+      };
+
+      eventSource.onerror = () => {
+        eventSource.close();
+      };
+
+      return () => {
+        eventSource.close();
+      };
+    }
+  }, [status?.authenticated, toast]);
 
   const syncCategoriesMutation = useMutation({
     mutationFn: async () => {
@@ -71,15 +119,6 @@ export default function BlingPage() {
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/bling/sync/products");
       return response.json();
-    },
-    onSuccess: (data: SyncResult) => {
-      const message = `Criados: ${data.created}, Atualizados: ${data.updated}`;
-      const errorCount = data.errors?.length || 0;
-      toast({
-        title: "Produtos Sincronizados",
-        description: errorCount > 0 ? `${message}. Erros: ${errorCount}` : message,
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
     },
     onError: (error: any) => {
       toast({
@@ -114,6 +153,11 @@ export default function BlingPage() {
   const handleConnect = () => {
     window.location.href = "/api/bling/auth";
   };
+
+  const isSyncing = syncProgress?.status === 'running';
+  const progressPercent = syncProgress && syncProgress.totalSteps > 0 
+    ? Math.round((syncProgress.currentStep / syncProgress.totalSteps) * 100) 
+    : 0;
 
   if (isLoading) {
     return (
@@ -222,7 +266,7 @@ export default function BlingPage() {
             <div className="flex flex-wrap gap-4">
               <Button
                 onClick={() => syncCategoriesMutation.mutate()}
-                disabled={syncCategoriesMutation.isPending}
+                disabled={syncCategoriesMutation.isPending || isSyncing}
                 variant="outline"
                 data-testid="button-sync-categories"
               >
@@ -236,10 +280,10 @@ export default function BlingPage() {
 
               <Button
                 onClick={() => syncProductsMutation.mutate()}
-                disabled={syncProductsMutation.isPending}
+                disabled={syncProductsMutation.isPending || isSyncing}
                 data-testid="button-sync-products"
               >
-                {syncProductsMutation.isPending ? (
+                {(syncProductsMutation.isPending || isSyncing) ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <Package className="h-4 w-4 mr-2" />
@@ -247,6 +291,69 @@ export default function BlingPage() {
                 Sincronizar Produtos
               </Button>
             </div>
+
+            {isSyncing && syncProgress && (
+              <div className="space-y-3 p-4 bg-muted/50 rounded-md" data-testid="sync-progress-container">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="font-medium text-sm">{syncProgress.phase}</span>
+                  </div>
+                  {syncProgress.estimatedRemaining && (
+                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>~{syncProgress.estimatedRemaining}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <Progress value={progressPercent} className="h-2" data-testid="sync-progress-bar" />
+                
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">{syncProgress.message}</span>
+                  <span className="font-medium">{progressPercent}%</span>
+                </div>
+                
+                <div className="flex gap-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    <CheckCircle className="h-3 w-3 text-green-500" />
+                    <span>{syncProgress.created} novos</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3 text-blue-500" />
+                    <span>{syncProgress.updated} atualizados</span>
+                  </div>
+                  {syncProgress.errors > 0 && (
+                    <div className="flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 text-destructive" />
+                      <span>{syncProgress.errors} erros</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {syncProgress?.status === 'completed' && (
+              <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-md" data-testid="sync-completed">
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">{syncProgress.message}</span>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {syncProgress.created} produtos criados, {syncProgress.updated} atualizados
+                  {syncProgress.errors > 0 && `, ${syncProgress.errors} erros`}
+                </div>
+              </div>
+            )}
+
+            {syncProgress?.status === 'error' && (
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-md" data-testid="sync-error">
+                <div className="flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-5 w-5" />
+                  <span className="font-medium">{syncProgress.message}</span>
+                </div>
+              </div>
+            )}
 
             <p className="text-sm text-muted-foreground">
               A sincronização irá importar ou atualizar categorias e produtos da sua conta Bling.

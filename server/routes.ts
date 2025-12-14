@@ -1143,6 +1143,23 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/bling/sync/progress", isAuthenticated, isAdmin, (req, res) => {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const sendProgress = (progress: blingService.SyncProgress) => {
+      res.write(`data: ${JSON.stringify(progress)}\n\n`);
+    };
+
+    const unsubscribe = blingService.subscribeSyncProgress(sendProgress);
+
+    req.on("close", () => {
+      unsubscribe();
+    });
+  });
+
   app.post("/api/bling/disconnect", isAuthenticated, isAdmin, async (req, res) => {
     try {
       // Clear the access token to disconnect
