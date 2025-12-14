@@ -96,14 +96,17 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
 // Orders table
-// Status flow: pending -> orcamento_enviado -> pedido_gerado -> faturado -> completed
-// pending: cart/draft, orcamento_enviado: sent by customer (no stock), 
-// pedido_gerado: stock RESERVED, faturado: stock DEDUCTED + sent to ERP
+// Status flow (affects stock): ORCAMENTO -> PEDIDO_GERADO -> FATURADO
+// - ORCAMENTO: no stock impact
+// - PEDIDO_GERADO: stock RESERVED
+// - FATURADO: stock DEDUCTED + sent to ERP
+// Stage flow (operational workflow): PENDENTE_IMPRESSAO -> IMPRESSO -> SEPARADO -> COBRADO -> FINALIZADO
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id), // nullable for guest orders
   orderNumber: text("order_number").notNull().unique(),
-  status: text("status").notNull().default("pending"),
+  status: text("status").notNull().default("ORCAMENTO"),
+  stage: text("stage").notNull().default("PENDENTE_IMPRESSAO"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),

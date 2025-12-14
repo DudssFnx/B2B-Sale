@@ -101,6 +101,9 @@ export interface IStorage {
   reserveStockForOrder(orderId: number, userId: string): Promise<{ success: boolean; error?: string }>;
   releaseStockForOrder(orderId: number): Promise<{ success: boolean; error?: string }>;
   deductStockForOrder(orderId: number, userId: string): Promise<{ success: boolean; error?: string }>;
+  
+  // Stage Management
+  updateOrderStage(orderId: number, stage: string): Promise<{ success: boolean; error?: string }>;
 }
 
 // Customer Analytics Types
@@ -1622,8 +1625,8 @@ export class DatabaseStorage implements IStorage {
     try {
       const order = await this.getOrder(orderId);
       if (!order) return { success: false, error: 'Pedido não encontrado' };
-      if (order.status !== 'PEDIDO_GERADO' && order.status !== 'COBRADO') {
-        return { success: false, error: 'Pedido precisa estar separado ou cobrado antes de faturar' };
+      if (order.status !== 'PEDIDO_GERADO') {
+        return { success: false, error: 'Pedido precisa estar com estoque reservado (PEDIDO_GERADO) antes de faturar' };
       }
       
       const orderItems = await this.getOrderItems(orderId);
@@ -1637,12 +1640,32 @@ export class DatabaseStorage implements IStorage {
       }
       
       await db.update(orders)
-        .set({ status: 'PEDIDO_FATURADO', invoicedAt: new Date(), invoicedBy: userId })
+        .set({ status: 'FATURADO', stage: 'FINALIZADO', invoicedAt: new Date(), invoicedBy: userId })
         .where(eq(orders.id, orderId));
       
       return { success: true };
     } catch (error) {
       return { success: false, error: 'Erro ao faturar pedido' };
+    }
+  }
+
+  async updateOrderStage(orderId: number, stage: string): Promise<{ success: boolean; error?: string }> {
+    const validStages = ['PENDENTE_IMPRESSAO', 'IMPRESSO', 'SEPARADO', 'COBRADO', 'FINALIZADO'];
+    if (!validStages.includes(stage)) {
+      return { success: false, error: 'Etapa inválida' };
+    }
+    
+    try {
+      const order = await this.getOrder(orderId);
+      if (!order) return { success: false, error: 'Pedido não encontrado' };
+      
+      await db.update(orders)
+        .set({ stage })
+        .where(eq(orders.id, orderId));
+      
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: 'Erro ao atualizar etapa' };
     }
   }
 }
