@@ -124,12 +124,14 @@ function AppContent() {
 
   if (!isAuthenticated) {
     return (
-      <Switch>
-        <Route path="/register" component={RegisterPage} />
-        <Route path="/login" component={LoginPage} />
-        <Route path="/catalog" component={PublicCatalogPage} />
-        <Route component={LandingPage} />
-      </Switch>
+      <CartProvider>
+        <Switch>
+          <Route path="/register" component={RegisterPage} />
+          <Route path="/login" component={LoginPage} />
+          <Route path="/catalogo" component={PublicCatalogPage} />
+          <Route component={LandingPage} />
+        </Switch>
+      </CartProvider>
     );
   }
 
