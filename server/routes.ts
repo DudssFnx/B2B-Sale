@@ -1077,25 +1077,23 @@ export async function registerRoutes(
     res.json(blingService.getStatus());
   });
 
-  app.post("/api/bling/webhook", express.raw({ type: 'application/json' }), async (req, res) => {
+  app.post("/api/bling/webhook", async (req: any, res) => {
     const signature = req.headers["x-bling-signature-256"] as string;
-    const rawBody = req.body.toString("utf8");
+    // Use rawBody captured by express.json() middleware in index.ts
+    const rawBody = req.rawBody ? req.rawBody.toString("utf8") : JSON.stringify(req.body);
 
     console.log("Bling webhook received:");
     console.log("- Signature header:", signature ? `${signature.substring(0, 20)}...` : "MISSING");
-    console.log("- Payload preview:", rawBody.substring(0, 200));
+    console.log("- Payload preview:", rawBody.substring(0, 300));
 
-    // Verify signature if present, but log and continue for debugging
+    // Verify signature
     if (signature) {
       const isValid = blingService.verifyWebhookSignature(rawBody, signature);
       console.log("- Signature valid:", isValid);
-      if (!isValid) {
-        console.warn("Signature verification failed but processing anyway for debugging");
-      }
     }
 
     try {
-      const payload = JSON.parse(rawBody);
+      const payload = req.rawBody ? JSON.parse(rawBody) : req.body;
       console.log("- Event:", payload.event, "- EventId:", payload.eventId);
       const result = await blingService.handleWebhook(payload);
       console.log("- Result:", result);
