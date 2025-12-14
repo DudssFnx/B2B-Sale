@@ -127,7 +127,7 @@ export default function LandingPage() {
     const price = typeof product.price === 'string' ? parseFloat(product.price) : product.price;
     
     addItem({
-      productId: product.id,
+      productId: String(product.id),
       name: product.name,
       sku: product.sku,
       price: price,
@@ -248,27 +248,6 @@ export default function LandingPage() {
                   className="w-full h-full object-cover"
                   data-testid="img-banner-1"
                 />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
-                  <div className="container mx-auto px-4">
-                    <div className="max-w-lg">
-                      <h2 className="text-2xl md:text-4xl font-bold text-white mb-2">
-                        Bem-vindo ao Madrugadao
-                      </h2>
-                      <p className="text-white/80 text-sm md:text-base mb-4">
-                        Os melhores produtos com os melhores precos
-                      </p>
-                      <Button 
-                        size="lg"
-                        onClick={() => setLocation("/catalogo")}
-                        className="bg-orange-500 hover:bg-orange-600"
-                        data-testid="button-ver-catalogo"
-                      >
-                        <ShoppingBag className="h-5 w-5 mr-2" />
-                        Ver Catalogo Completo
-                      </Button>
-                    </div>
-                  </div>
-                </div>
               </div>
             </CarouselItem>
             <CarouselItem>
