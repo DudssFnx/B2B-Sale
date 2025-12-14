@@ -65,7 +65,7 @@ Users require admin approval before accessing the system (except admins who are 
 - **esbuild**: Server-side bundling for production
 - **TSX**: TypeScript execution for development
 
-## Integração Bling (Planejado)
+## Integração Bling (Implementado)
 
 ### Documentação
 - Ver `docs/bling-api-integration.md` para detalhes completos
@@ -74,7 +74,12 @@ Users require admin approval before accessing the system (except admins who are 
 - **API**: Bling API v3 (OAuth 2.0)
 - **Base URL**: `https://api.bling.com.br/Api/v3`
 - **Autenticação**: Bearer token via OAuth 2.0
-- **Endpoint de Produtos**: `GET /produtos`
+
+### Funcionalidades Implementadas
+1. **Sincronização de Produtos**: Importa produtos do Bling para o catálogo (`GET /produtos`)
+2. **Sincronização de Categorias**: Importa categorias do Bling
+3. **Webhooks**: Recebe atualizações em tempo real de produtos e estoque
+4. **Envio de Pedidos**: Quando um pedido é criado no site, é enviado automaticamente ao Bling (`POST /pedidos/vendas`)
 
 ### Credenciais Necessárias
 - `BLING_CLIENT_ID` - ID do aplicativo OAuth
