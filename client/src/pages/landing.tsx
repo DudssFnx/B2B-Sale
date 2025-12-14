@@ -22,7 +22,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { Product as SchemaProduct, Category } from "@shared/schema";
 import logoImage from "@assets/image_1765659931449.png";
-import bannerImage from "@assets/image_1765667052902.png";
+import bannerImage from "@assets/image_1765675881591.png";
 
 interface ProductsResponse {
   products: SchemaProduct[];
