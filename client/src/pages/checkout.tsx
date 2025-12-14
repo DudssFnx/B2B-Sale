@@ -273,7 +273,7 @@ export default function CheckoutPage() {
     try {
       const orderData: any = {
         items: items.map(item => ({
-          productId: item.id,
+          productId: parseInt(item.productId, 10),
           quantity: item.quantity,
           unitPrice: item.price,
           totalPrice: item.price * item.quantity,
