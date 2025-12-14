@@ -150,22 +150,13 @@ export async function refreshAccessToken(): Promise<BlingTokens> {
 }
 
 async function getValidAccessToken(): Promise<string> {
-  let accessToken = process.env.BLING_ACCESS_TOKEN;
+  const accessToken = process.env.BLING_ACCESS_TOKEN;
   
   if (!accessToken) {
     throw new Error("Not authenticated with Bling. Please authorize first.");
   }
   
-  if (Date.now() >= tokenExpiresAt && process.env.BLING_REFRESH_TOKEN) {
-    try {
-      const tokens = await refreshAccessToken();
-      accessToken = tokens.access_token;
-    } catch (error) {
-      console.error("Failed to refresh token:", error);
-      throw new Error("Token expired. Please re-authorize with Bling.");
-    }
-  }
-  
+  // Always return the access token - refresh will happen on 401 in blingApiRequest
   return accessToken;
 }
 
