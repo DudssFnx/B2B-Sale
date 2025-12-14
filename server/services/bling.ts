@@ -680,21 +680,79 @@ async function handleProductEvent(data: WebhookProductData): Promise<{ success: 
     return { success: true, message: `Inactive product ${sku} ignored` };
   }
 
-  const productData: Partial<InsertProduct> = {
-    name: data.nome,
+  // Fetch full product details from Bling API to get image and category
+  console.log(`Fetching full details for product ${data.id}...`);
+  const fullProduct = await fetchBlingProductDetails(data.id);
+  
+  if (!fullProduct) {
+    // Fallback to basic webhook data if API call fails
+    const productData: Partial<InsertProduct> = {
+      name: data.nome,
+      sku,
+      description: data.descricaoCurta || null,
+      price: String(data.preco || 0),
+    };
+
+    const existing = await db.select().from(products).where(eq(products.sku, sku)).limit(1);
+    if (existing.length === 0) {
+      await db.insert(products).values(productData as InsertProduct);
+      return { success: true, message: `Product ${sku} created (basic data only)` };
+    } else {
+      await db.update(products).set(productData).where(eq(products.sku, sku));
+      return { success: true, message: `Product ${sku} updated (basic data only)` };
+    }
+  }
+
+  // Extract image URL
+  let imageUrl: string | null = null;
+  if (fullProduct.imagens && fullProduct.imagens.length > 0) {
+    const sortedImages = [...fullProduct.imagens].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+    imageUrl = sortedImages[0]?.linkExterno || sortedImages[0]?.link || null;
+  }
+  if (!imageUrl && fullProduct.midia?.imagens?.externas?.[0]?.link) {
+    imageUrl = fullProduct.midia.imagens.externas[0].link;
+  }
+  if (!imageUrl && fullProduct.midia?.imagens?.internas?.[0]?.link) {
+    imageUrl = fullProduct.midia.imagens.internas[0].link;
+  }
+
+  // Find category by blingId
+  let categoryId: number | null = null;
+  if (fullProduct.categoria?.id) {
+    const existingCategories = await db.select().from(categories);
+    const matchingCategory = existingCategories.find(c => c.blingId === fullProduct.categoria?.id);
+    if (matchingCategory) {
+      categoryId = matchingCategory.id;
+    }
+  }
+
+  const productData: InsertProduct = {
+    name: fullProduct.nome,
     sku,
-    description: data.descricaoCurta || null,
-    price: String(data.preco || 0),
+    categoryId,
+    brand: fullProduct.marca || null,
+    description: fullProduct.descricaoComplementar || fullProduct.descricaoCurta || null,
+    price: String(fullProduct.preco || 0),
+    stock: fullProduct.estoque?.saldoVirtual ?? fullProduct.estoque?.saldoFisico ?? 0,
+    image: imageUrl,
   };
 
   const existing = await db.select().from(products).where(eq(products.sku, sku)).limit(1);
 
   if (existing.length === 0) {
-    await db.insert(products).values(productData as InsertProduct);
-    return { success: true, message: `Product ${sku} created` };
+    await db.insert(products).values(productData);
+    return { success: true, message: `Product ${sku} created with full details` };
   } else {
-    await db.update(products).set(productData).where(eq(products.sku, sku));
-    return { success: true, message: `Product ${sku} updated` };
+    await db.update(products).set({
+      name: productData.name,
+      categoryId: productData.categoryId,
+      brand: productData.brand,
+      description: productData.description,
+      price: productData.price,
+      stock: productData.stock,
+      image: productData.image,
+    }).where(eq(products.sku, sku));
+    return { success: true, message: `Product ${sku} updated with full details` };
   }
 }
 
