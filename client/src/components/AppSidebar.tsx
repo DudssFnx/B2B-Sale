@@ -105,16 +105,31 @@ export function AppSidebar({ userRole = "customer", userName = "User", onLogout 
             <p className="text-xs text-muted-foreground capitalize">Portal Atacado</p>
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full mt-3"
-          onClick={() => window.open('/', '_blank')}
-          data-testid="button-ver-catalogo"
-        >
-          <ExternalLink className="h-4 w-4 mr-2" />
-          Ver Catalogo
-        </Button>
+        <div className="mt-3 space-y-1">
+          <p className="text-xs text-muted-foreground mb-1">Ver Catalogo como:</p>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => window.open('/', '_blank')}
+              data-testid="button-ver-varejo"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Varejo
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1"
+              onClick={() => window.open('/catalog', '_blank')}
+              data-testid="button-ver-atacado"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Atacado
+            </Button>
+          </div>
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
