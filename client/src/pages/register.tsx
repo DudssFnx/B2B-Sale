@@ -181,6 +181,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState(1);
   const [step1Data, setStep1Data] = useState<Step1Data | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isAutoApproved, setIsAutoApproved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [honeypot, setHoneypot] = useState("");
@@ -219,10 +220,26 @@ export default function RegisterPage() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: Step1Data & Step2Data) => {
-      return apiRequest("POST", "/api/register", data);
+      const response = await apiRequest("POST", "/api/register", data);
+      return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { message: string; userId: string; approved: boolean }) => {
       setSuccess(true);
+      setIsAutoApproved(data.approved);
+      
+      // If auto-approved (retail customer), redirect to login with checkout redirect
+      if (data.approved) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirectTo = urlParams.get('redirect');
+        const step = urlParams.get('step');
+        
+        if (redirectTo) {
+          const loginUrl = step 
+            ? `/login?redirect=${encodeURIComponent(redirectTo)}&step=${step}&registered=true`
+            : `/login?redirect=${encodeURIComponent(redirectTo)}&registered=true`;
+          setTimeout(() => setLocation(loginUrl), 2000);
+        }
+      }
     },
     onError: (err: Error) => {
       setError(err.message || "Erro ao criar cadastro");
@@ -274,6 +291,9 @@ export default function RegisterPage() {
   const personType = form1.watch("personType");
 
   if (success) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasCheckoutRedirect = urlParams.get('redirect')?.includes('/checkout');
+    
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
@@ -281,17 +301,48 @@ export default function RegisterPage() {
             <div className="mx-auto mb-4 p-4 bg-green-100 dark:bg-green-900/30 rounded-full w-fit">
               <CheckCircle className="h-12 w-12 text-green-600 dark:text-green-400" />
             </div>
-            <CardTitle className="text-2xl">Cadastro Enviado!</CardTitle>
+            <CardTitle className="text-2xl">
+              {isAutoApproved ? "Cadastro Aprovado!" : "Cadastro Enviado!"}
+            </CardTitle>
             <CardDescription className="text-base mt-2">
-              Sua solicitação de acesso foi enviada com sucesso. Nossa equipe irá analisar 
-              seu cadastro e você receberá uma confirmação por e-mail em breve.
+              {isAutoApproved ? (
+                hasCheckoutRedirect ? (
+                  "Seu cadastro foi aprovado automaticamente! Voce sera redirecionado para fazer login e finalizar sua compra..."
+                ) : (
+                  "Seu cadastro foi aprovado automaticamente! Voce ja pode fazer login."
+                )
+              ) : (
+                "Sua solicitacao de acesso foi enviada com sucesso. Nossa equipe ira analisar seu cadastro e voce recebera uma confirmacao por e-mail em breve."
+              )}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Button onClick={() => setLocation("/")} className="gap-2" data-testid="button-back-home">
-              <ArrowLeft className="h-4 w-4" />
-              Voltar para Início
-            </Button>
+          <CardContent className="space-y-3">
+            {isAutoApproved ? (
+              <Button 
+                onClick={() => {
+                  const redirect = urlParams.get('redirect');
+                  const step = urlParams.get('step');
+                  if (redirect) {
+                    const loginUrl = step 
+                      ? `/login?redirect=${encodeURIComponent(redirect)}&step=${step}`
+                      : `/login?redirect=${encodeURIComponent(redirect)}`;
+                    setLocation(loginUrl);
+                  } else {
+                    setLocation("/login");
+                  }
+                }} 
+                className="gap-2 bg-orange-500 hover:bg-orange-600" 
+                data-testid="button-go-login"
+              >
+                <ArrowRight className="h-4 w-4" />
+                Fazer Login
+              </Button>
+            ) : (
+              <Button onClick={() => setLocation("/")} className="gap-2" data-testid="button-back-home">
+                <ArrowLeft className="h-4 w-4" />
+                Voltar para Inicio
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

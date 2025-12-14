@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,6 +38,22 @@ export default function CheckoutPage() {
   const { items, total, itemCount } = useCart();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>("resumo");
+
+  // Handle step from URL query parameter (after login/register redirect)
+  useEffect(() => {
+    // Use window.location.search which updates on SPA navigation
+    const checkStepParam = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const stepParam = urlParams.get('step') as CheckoutStep;
+      if (stepParam && steps.find(s => s.key === stepParam)) {
+        setCurrentStep(stepParam);
+        // Clean up URL after reading the step
+        window.history.replaceState({}, '', '/checkout');
+      }
+    };
+    
+    checkStepParam();
+  }, []);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -297,24 +313,38 @@ export default function CheckoutPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Truck className="h-5 w-5" />
-                    Endereco de Entrega
+                    Frete
                   </CardTitle>
                   <CardDescription>
-                    Informe onde deseja receber seu pedido
+                    Opcoes de entrega
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30 text-center">
-                    <MapPin className="h-8 w-8 mx-auto mb-2 text-orange-500" />
-                    <p className="text-sm">
-                      Esta etapa estara disponivel apos o cadastro/login
+                  <div className="p-6 rounded-lg bg-muted/50 border text-center">
+                    <Truck className="h-12 w-12 mx-auto mb-3 text-orange-500" />
+                    <h3 className="font-semibold text-lg mb-2">Frete a Combinar</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      O frete sera combinado com nosso time apos a confirmacao do pedido
                     </p>
+                    <Badge variant="secondary" className="text-sm">
+                      Entraremos em contato via WhatsApp
+                    </Badge>
                   </div>
                   
-                  <Button variant="ghost" onClick={goToPreviousStep}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Voltar
-                  </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button variant="ghost" onClick={goToPreviousStep}>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Voltar
+                    </Button>
+                    <Button 
+                      className="bg-orange-500 hover:bg-orange-600"
+                      onClick={goToNextStep}
+                      data-testid="button-confirm-frete"
+                    >
+                      Continuar
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -324,24 +354,41 @@ export default function CheckoutPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="h-5 w-5" />
-                    Forma de Pagamento
+                    Pagamento
                   </CardTitle>
                   <CardDescription>
-                    Escolha como deseja pagar
+                    Forma de pagamento
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30 text-center">
-                    <CreditCard className="h-8 w-8 mx-auto mb-2 text-orange-500" />
-                    <p className="text-sm">
-                      Esta etapa estara disponivel apos o cadastro/login
+                  <div className="p-6 rounded-lg bg-muted/50 border text-center">
+                    <CreditCard className="h-12 w-12 mx-auto mb-3 text-orange-500" />
+                    <h3 className="font-semibold text-lg mb-2">Pagamento a Combinar</h3>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      As opcoes de pagamento serao combinadas com nosso time apos a confirmacao do pedido
                     </p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      <Badge variant="secondary">PIX</Badge>
+                      <Badge variant="secondary">Boleto</Badge>
+                      <Badge variant="secondary">Cartao</Badge>
+                      <Badge variant="secondary">Transferencia</Badge>
+                    </div>
                   </div>
                   
-                  <Button variant="ghost" onClick={goToPreviousStep}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Voltar
-                  </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button variant="ghost" onClick={goToPreviousStep}>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Voltar
+                    </Button>
+                    <Button 
+                      className="bg-orange-500 hover:bg-orange-600"
+                      onClick={goToNextStep}
+                      data-testid="button-confirm-pagamento"
+                    >
+                      Continuar
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -351,24 +398,59 @@ export default function CheckoutPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CheckCircle className="h-5 w-5" />
-                    Confirmacao
+                    Confirmacao do Pedido
                   </CardTitle>
                   <CardDescription>
                     Revise e confirme seu pedido
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/30 text-center">
-                    <CheckCircle className="h-8 w-8 mx-auto mb-2 text-orange-500" />
-                    <p className="text-sm">
-                      Esta etapa estara disponivel apos preencher frete e pagamento
+                  <div className="space-y-3">
+                    <div className="p-3 rounded-lg bg-muted/50 flex items-center gap-3">
+                      <Truck className="h-5 w-5 text-orange-500" />
+                      <div>
+                        <p className="font-medium text-sm">Frete</p>
+                        <p className="text-xs text-muted-foreground">A combinar</p>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-lg bg-muted/50 flex items-center gap-3">
+                      <CreditCard className="h-5 w-5 text-orange-500" />
+                      <div>
+                        <p className="font-medium text-sm">Pagamento</p>
+                        <p className="text-xs text-muted-foreground">A combinar</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+                  
+                  <div className="text-center p-4 rounded-lg bg-green-500/10 border border-green-500/30">
+                    <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                    <p className="text-sm font-medium">
+                      Apos confirmar, entraremos em contato para combinar frete e pagamento
                     </p>
                   </div>
                   
-                  <Button variant="ghost" onClick={goToPreviousStep}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Voltar
-                  </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button variant="ghost" onClick={goToPreviousStep}>
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Voltar
+                    </Button>
+                    <Button 
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => {
+                        toast({
+                          title: "Faca login para confirmar",
+                          description: "Voce precisa estar logado para finalizar o pedido",
+                        });
+                        setLocation("/login?redirect=/checkout&step=confirmacao");
+                      }}
+                      data-testid="button-finalizar-pedido"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Finalizar Pedido
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )}

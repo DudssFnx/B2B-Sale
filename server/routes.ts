@@ -123,7 +123,10 @@ export async function registerRoutes(
         hashedPassword = await bcrypt.hash(data.password, 10);
       }
 
-      // Create new user with pending approval
+      // Auto-approve retail customers (personType = fisica)
+      const isRetailCustomer = data.personType === 'fisica';
+      
+      // Create new user with pending approval (auto-approved for retail)
       const newUser = await storage.upsertUser({
         id: crypto.randomUUID(),
         email: data.email,
@@ -133,7 +136,7 @@ export async function registerRoutes(
         profileImageUrl: null,
         role: "customer",
         company: data.company || null,
-        approved: false,
+        approved: isRetailCustomer,
         phone: data.phone || null,
         personType: data.personType || null,
         cnpj: data.cnpj || null,
@@ -149,7 +152,15 @@ export async function registerRoutes(
         state: data.state || null,
       });
 
-      res.status(201).json({ message: "Cadastro realizado com sucesso", userId: newUser.id });
+      const message = isRetailCustomer 
+        ? "Cadastro realizado com sucesso! Voce ja pode fazer login."
+        : "Cadastro realizado com sucesso! Aguarde aprovacao do administrador.";
+      
+      res.status(201).json({ 
+        message, 
+        userId: newUser.id,
+        approved: newUser.approved 
+      });
     } catch (error) {
       console.error("Error registering user:", error);
       res.status(500).json({ message: "Erro ao criar cadastro" });

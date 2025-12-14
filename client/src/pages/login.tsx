@@ -45,7 +45,18 @@ export default function LoginPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      setLocation("/");
+      
+      // Handle redirect after login (e.g., from checkout flow)
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectTo = urlParams.get('redirect');
+      const step = urlParams.get('step');
+      
+      if (redirectTo) {
+        const redirectUrl = step ? `${redirectTo}?step=${step}` : redirectTo;
+        setLocation(redirectUrl);
+      } else {
+        setLocation("/");
+      }
     },
     onError: (err: Error) => {
       setError(err.message || "E-mail ou senha incorretos");
