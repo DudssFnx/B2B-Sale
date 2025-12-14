@@ -18,9 +18,7 @@ import {
   List,
   Home,
   Filter,
-  ShoppingCart,
-  Plus,
-  Minus
+  ShoppingCart
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { Product as SchemaProduct, Category } from "@shared/schema";
@@ -162,16 +160,25 @@ export default function PublicCatalogPage() {
     setShowMobileFilters(false);
   };
 
-  const getQuantity = (productId: number) => quantities[productId] || 1;
+  const getQuantity = (productId: number) => quantities[productId] ?? 0;
 
   const setQuantity = (productId: number, qty: number) => {
-    if (qty < 1) qty = 1;
+    if (qty < 0) qty = 0;
     if (qty > 999) qty = 999;
     setQuantities(prev => ({ ...prev, [productId]: qty }));
   };
 
   const handleAddToCart = (product: SchemaProduct) => {
     const qty = getQuantity(product.id);
+    if (qty <= 0) {
+      toast({
+        title: "Informe a quantidade",
+        description: "Digite a quantidade desejada",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const price = typeof product.price === 'string' ? parseFloat(product.price) : product.price;
     
     addItem({
@@ -188,7 +195,7 @@ export default function PublicCatalogPage() {
       description: `${qty}x ${product.name}`,
     });
 
-    setQuantities(prev => ({ ...prev, [product.id]: 1 }));
+    setQuantities(prev => ({ ...prev, [product.id]: 0 }));
   };
 
   return (
@@ -495,44 +502,22 @@ export default function PublicCatalogPage() {
                       </p>
                       
                       {product.stock > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 shrink-0"
-                              onClick={() => setQuantity(product.id, getQuantity(product.id) - 1)}
-                              disabled={getQuantity(product.id) <= 1}
-                              data-testid={`button-qty-minus-${product.id}`}
-                            >
-                              <Minus className="h-3 w-3" />
-                            </Button>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="999"
-                              value={getQuantity(product.id)}
-                              onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 1)}
-                              className="h-8 w-12 text-center px-1 text-sm"
-                              data-testid={`input-qty-${product.id}`}
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-8 w-8 shrink-0"
-                              onClick={() => setQuantity(product.id, getQuantity(product.id) + 1)}
-                              data-testid={`button-qty-plus-${product.id}`}
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="999"
+                            value={getQuantity(product.id)}
+                            onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 0)}
+                            className="h-9 w-16 text-center text-sm"
+                            data-testid={`input-qty-${product.id}`}
+                          />
                           <Button
-                            className="w-full bg-orange-500 hover:bg-orange-600 text-white h-9"
+                            className="flex-1 bg-orange-500 hover:bg-orange-600 text-white h-9 font-semibold"
                             onClick={() => handleAddToCart(product)}
                             data-testid={`button-add-cart-${product.id}`}
                           >
-                            <ShoppingCart className="h-4 w-4 mr-1" />
-                            Comprar
+                            COMPRAR
                           </Button>
                         </div>
                       )}
@@ -584,43 +569,21 @@ export default function PublicCatalogPage() {
                         
                         {product.stock > 0 && (
                           <div className="flex items-center gap-2 mt-2">
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setQuantity(product.id, getQuantity(product.id) - 1)}
-                                disabled={getQuantity(product.id) <= 1}
-                                data-testid={`button-qty-minus-${product.id}`}
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <Input
-                                type="number"
-                                min="1"
-                                max="999"
-                                value={getQuantity(product.id)}
-                                onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 1)}
-                                className="h-7 w-12 text-center px-1 text-sm"
-                                data-testid={`input-qty-${product.id}`}
-                              />
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-7 w-7"
-                                onClick={() => setQuantity(product.id, getQuantity(product.id) + 1)}
-                                data-testid={`button-qty-plus-${product.id}`}
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="999"
+                              value={getQuantity(product.id)}
+                              onChange={(e) => setQuantity(product.id, parseInt(e.target.value) || 0)}
+                              className="h-8 w-14 text-center text-sm"
+                              data-testid={`input-qty-${product.id}`}
+                            />
                             <Button
-                              className="bg-orange-500 hover:bg-orange-600 text-white h-7 text-xs"
+                              className="bg-orange-500 hover:bg-orange-600 text-white h-8 font-semibold"
                               onClick={() => handleAddToCart(product)}
                               data-testid={`button-add-cart-${product.id}`}
                             >
-                              <ShoppingCart className="h-3 w-3 mr-1" />
-                              Comprar
+                              COMPRAR
                             </Button>
                           </div>
                         )}
