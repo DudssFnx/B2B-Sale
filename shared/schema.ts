@@ -61,6 +61,7 @@ export const categories = pgTable("categories", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   parentId: integer("parent_id"),
+  hideFromVarejo: boolean("hide_from_varejo").notNull().default(false),
   blingId: integer("bling_id"),
 });
 
