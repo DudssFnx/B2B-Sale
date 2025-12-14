@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Loader2, Package, Grid3X3, Box, Zap, Wrench, Coffee, Heart, Star, Bookmark, Layers, ShoppingBag, ChevronRight, ChevronDown, FolderTree, Plus, Edit, Trash2, EyeOff } from "lucide-react";
+import { Loader2, Package, Grid3X3, Box, Zap, Wrench, Coffee, Heart, Star, Bookmark, Layers, ShoppingBag, ChevronRight, ChevronDown, FolderTree, Plus, Edit, Trash2, EyeOff, Eye } from "lucide-react";
 import type { Category, Product } from "@shared/schema";
 
 const categoryIcons: Record<string, typeof Package> = {
@@ -430,7 +430,7 @@ function CategoryCard({
                       <Button
                         size="icon"
                         variant="ghost"
-                        className={`h-7 w-7 ${category.hideFromVarejo ? 'text-orange-500' : 'text-muted-foreground'}`}
+                        className={`h-7 w-7 ${category.hideFromVarejo ? 'text-green-500' : 'text-muted-foreground'}`}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -440,7 +440,11 @@ function CategoryCard({
                         title={category.hideFromVarejo ? "Mostrar para Varejo" : "Ocultar do Varejo"}
                         data-testid={`button-toggle-varejo-${category.id}`}
                       >
-                        <EyeOff className="h-3.5 w-3.5" />
+                        {category.hideFromVarejo ? (
+                          <Eye className="h-3.5 w-3.5" />
+                        ) : (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        )}
                       </Button>
                       <Button
                         size="icon"
