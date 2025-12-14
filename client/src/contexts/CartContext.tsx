@@ -12,6 +12,11 @@ export interface CartItem {
   image?: string;
 }
 
+export interface SelectedCustomer {
+  id: string;
+  name: string;
+}
+
 interface CartContextType {
   items: CartItem[];
   addItem: (item: Omit<CartItem, "id">) => void;
@@ -23,6 +28,8 @@ interface CartContextType {
   isOpen: boolean;
   openCart: () => void;
   closeCart: () => void;
+  selectedCustomer: SelectedCustomer | null;
+  setSelectedCustomer: (customer: SelectedCustomer | null) => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -53,6 +60,7 @@ function saveCartToStorage(items: CartItem[]) {
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>(() => loadCartFromStorage());
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null);
 
   useEffect(() => {
     saveCartToStorage(items);
@@ -88,6 +96,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const clearCart = useCallback(() => {
     setItems([]);
+    setSelectedCustomer(null);
   }, []);
 
   const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -109,6 +118,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         isOpen,
         openCart,
         closeCart,
+        selectedCustomer,
+        setSelectedCustomer,
       }}
     >
       {children}

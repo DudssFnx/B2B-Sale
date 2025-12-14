@@ -13,7 +13,7 @@ interface CartDrawerProps {
 }
 
 export function CartDrawer({ isAuthenticated = false }: CartDrawerProps) {
-  const { items, isOpen, closeCart, updateQuantity, removeItem, total, clearCart } = useCart();
+  const { items, isOpen, closeCart, updateQuantity, removeItem, total, clearCart, selectedCustomer } = useCart();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
@@ -30,7 +30,11 @@ export function CartDrawer({ isAuthenticated = false }: CartDrawerProps) {
         productId: parseInt(item.productId),
         quantity: item.quantity,
       }));
-      const response = await apiRequest("POST", "/api/orders", { items: orderItems });
+      const payload: any = { items: orderItems };
+      if (selectedCustomer) {
+        payload.userId = selectedCustomer.id;
+      }
+      const response = await apiRequest("POST", "/api/orders", payload);
       return response.json();
     },
     onSuccess: (data) => {

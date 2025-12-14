@@ -29,7 +29,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Pencil, Trash2, Loader2, Upload, Image, X } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, Upload, Image, X, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -46,6 +46,7 @@ interface ProductData {
   stock: number;
   description: string | null;
   image: string | null;
+  images: string[] | null;
 }
 
 const productSchema = z.object({
@@ -65,9 +66,10 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const MAX_IMAGES = 5;
 
   const { data: productsResponse, isLoading } = useQuery<{ products: SchemaProduct[]; total: number }>({
     queryKey: ['/api/products'],
@@ -107,6 +109,7 @@ export default function ProductsPage() {
     stock: p.stock,
     description: p.description,
     image: p.image,
+    images: p.images || null,
   }));
 
   const form = useForm<ProductFormValues>({
@@ -129,6 +132,15 @@ export default function ProductsPage() {
   );
 
   const handleImageUpload = async (file: File) => {
+    if (imageUrls.length >= MAX_IMAGES) {
+      toast({ 
+        title: "Limite atingido", 
+        description: `Máximo de ${MAX_IMAGES} imagens por produto.`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     setIsUploading(true);
     try {
       const formData = new FormData();
@@ -146,8 +158,8 @@ export default function ProductsPage() {
       }
       
       const data = await response.json();
-      setImageUrl(data.url);
-      toast({ title: "Imagem enviada", description: "A imagem foi enviada com sucesso." });
+      setImageUrls(prev => [...prev, data.url]);
+      toast({ title: "Imagem enviada", description: `Imagem ${imageUrls.length + 1} de ${MAX_IMAGES} enviada.` });
     } catch (error: any) {
       toast({ 
         title: "Erro no upload", 
@@ -157,6 +169,10 @@ export default function ProductsPage() {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImageUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const createProductMutation = useMutation({
@@ -169,7 +185,8 @@ export default function ProductsPage() {
         price: data.price.toFixed(2),
         stock: data.stock,
         description: data.description || null,
-        image: imageUrl,
+        image: imageUrls[0] || null,
+        images: imageUrls.length > 0 ? imageUrls : null,
       };
       await apiRequest("POST", "/api/products", payload);
     },
@@ -188,7 +205,8 @@ export default function ProductsPage() {
         price: data.price.toFixed(2),
         stock: data.stock,
         description: data.description || null,
-        image: imageUrl,
+        image: imageUrls[0] || null,
+        images: imageUrls.length > 0 ? imageUrls : null,
       };
       await apiRequest("PATCH", `/api/products/${id}`, payload);
     },
@@ -209,7 +227,7 @@ export default function ProductsPage() {
   const openAddDialog = () => {
     form.reset({ name: "", sku: "", categoryId: "", brand: "", price: 0, stock: 0, description: "" });
     setEditingProduct(null);
-    setImageUrl(null);
+    setImageUrls([]);
     setIsDialogOpen(true);
   };
 
@@ -224,7 +242,25 @@ export default function ProductsPage() {
       description: product.description || "",
     });
     setEditingProduct(product);
-    setImageUrl(product.image);
+    const existingImages = product.images || (product.image ? [product.image] : []);
+    setImageUrls(existingImages);
+    setIsDialogOpen(true);
+  };
+
+  const openCloneDialog = (product: ProductData) => {
+    const uniqueSuffix = Date.now().toString(36).slice(-4).toUpperCase();
+    form.reset({
+      name: product.name + " (Cópia)",
+      sku: product.sku + "-" + uniqueSuffix,
+      categoryId: product.categoryId ? String(product.categoryId) : "",
+      brand: product.brand,
+      price: product.price,
+      stock: product.stock,
+      description: product.description || "",
+    });
+    setEditingProduct(null);
+    const existingImages = product.images || (product.image ? [product.image] : []);
+    setImageUrls(existingImages);
     setIsDialogOpen(true);
   };
 
@@ -360,6 +396,15 @@ export default function ProductsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          onClick={() => openCloneDialog(product)}
+                          title="Duplicar produto"
+                          data-testid={`button-clone-product-${product.id}`}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => openEditDialog(product)}
                           data-testid={`button-edit-product-${product.id}`}
                         >
@@ -394,56 +439,53 @@ export default function ProductsPage() {
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <FormLabel>Imagem do Produto</FormLabel>
-                  <div className="mt-2 flex items-start gap-4">
-                    <div className="w-32 h-32 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/30 overflow-hidden">
-                      {imageUrl ? (
-                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                      ) : (
-                        <Image className="h-8 w-8 text-muted-foreground/50" />
-                      )}
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        className="hidden"
-                        ref={fileInputRef}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleImageUpload(file);
-                        }}
-                        data-testid="input-product-image"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isUploading}
-                        data-testid="button-upload-image"
-                      >
-                        {isUploading ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4 mr-2" />
-                        )}
-                        {isUploading ? "Enviando..." : "Enviar Imagem"}
-                      </Button>
-                      {imageUrl && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setImageUrl(null)}
-                          className="text-destructive"
-                          data-testid="button-remove-image"
+                  <FormLabel>Imagens do Produto ({imageUrls.length}/{MAX_IMAGES})</FormLabel>
+                  <div className="mt-2 space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {imageUrls.map((url, index) => (
+                        <div key={index} className="relative w-20 h-20 rounded-lg border overflow-hidden group">
+                          <img src={url} alt={`Imagem ${index + 1}`} className="w-full h-full object-cover" />
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => removeImage(index)}
+                            data-testid={`button-remove-image-${index}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                          {index === 0 && (
+                            <Badge className="absolute bottom-1 left-1 text-xs px-1 py-0">Principal</Badge>
+                          )}
+                        </div>
+                      ))}
+                      {imageUrls.length < MAX_IMAGES && (
+                        <div 
+                          className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/30 cursor-pointer hover-elevate"
+                          onClick={() => fileInputRef.current?.click()}
                         >
-                          <X className="h-4 w-4 mr-1" />
-                          Remover
-                        </Button>
+                          {isUploading ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                          ) : (
+                            <Plus className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
                       )}
-                      <p className="text-xs text-muted-foreground">JPG, PNG, WebP ou GIF. Máximo 5MB.</p>
                     </div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      ref={fileInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(file);
+                        e.target.value = '';
+                      }}
+                      data-testid="input-product-image"
+                    />
+                    <p className="text-xs text-muted-foreground">JPG, PNG, WebP ou GIF. Máximo 5MB por imagem. A primeira imagem é a principal.</p>
                   </div>
                 </div>
 

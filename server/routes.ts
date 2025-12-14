@@ -1355,43 +1355,43 @@ export async function registerRoutes(
 
           doc.font('Helvetica').fontSize(9);
           let totalQty = 0;
-          const imgHeight = 40;
+          const imgHeight = 22;
 
           for (const item of items) {
             totalQty += item.quantity;
 
-            if (doc.y > 680) {
+            if (doc.y > 700) {
               doc.addPage();
             }
 
             const rowY = doc.y;
 
             // Checkbox grande
-            doc.rect(colCheck, rowY, 15, 15).stroke();
+            doc.rect(colCheck, rowY, 12, 12).stroke();
             
             // Foto do produto
             if (item.product?.imageUrl) {
               try {
                 const imgBuffer = await fetchImageBuffer(item.product.imageUrl);
                 if (imgBuffer) {
-                  doc.image(imgBuffer, colImg, rowY, { width: 40, height: imgHeight, fit: [40, imgHeight] });
+                  doc.image(imgBuffer, colImg, rowY, { width: 22, height: imgHeight, fit: [22, imgHeight] });
                 }
               } catch (e) {
-                doc.rect(colImg, rowY, 40, imgHeight).stroke();
+                doc.rect(colImg, rowY, 22, imgHeight).stroke();
               }
             } else {
-              doc.rect(colImg, rowY, 40, imgHeight).stroke();
+              doc.rect(colImg, rowY, 22, imgHeight).stroke();
             }
             
-            doc.text(item.product?.sku || '-', colCode, rowY + 12, { width: 45 });
-            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY + 12, { width: 305 });
+            doc.text(item.product?.sku || '-', colCode, rowY + 6, { width: 45 });
+            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY + 6, { width: 305 });
             
             // Quantidade em fonte grande e destacada
-            doc.font('Helvetica-Bold').fontSize(14);
-            doc.text(item.quantity.toString(), colQty, rowY + 10);
+            doc.font('Helvetica-Bold').fontSize(12);
+            doc.text(item.quantity.toString(), colQty, rowY + 4);
             doc.font('Helvetica').fontSize(9);
 
-            doc.y = rowY + imgHeight + 5;
+            doc.y = rowY + imgHeight + 3;
           }
 
           doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
@@ -1595,12 +1595,12 @@ export async function registerRoutes(
 
           doc.font('Helvetica').fontSize(9);
           let totalQty = 0;
-          const imgHeight = 40;
+          const imgHeight = 22;
 
           for (const item of items) {
             totalQty += item.quantity;
 
-            if (doc.y > 640) {
+            if (doc.y > 700) {
               doc.addPage();
             }
 
@@ -1611,26 +1611,26 @@ export async function registerRoutes(
               try {
                 const imgBuffer = await fetchImageBuffer(item.product.imageUrl);
                 if (imgBuffer) {
-                  doc.image(imgBuffer, colImg, rowY, { width: 40, height: imgHeight, fit: [40, imgHeight] });
+                  doc.image(imgBuffer, colImg, rowY, { width: 22, height: imgHeight, fit: [22, imgHeight] });
                 }
               } catch (e) {
-                doc.rect(colImg, rowY, 40, imgHeight).stroke();
+                doc.rect(colImg, rowY, 22, imgHeight).stroke();
               }
             } else {
-              doc.rect(colImg, rowY, 40, imgHeight).stroke();
+              doc.rect(colImg, rowY, 22, imgHeight).stroke();
             }
 
-            doc.text(item.product?.sku || '-', colCode, rowY + 12, { width: 45 });
-            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY + 12, { width: 250 });
+            doc.text(item.product?.sku || '-', colCode, rowY + 6, { width: 45 });
+            doc.text(item.product?.name || `Produto #${item.productId}`, colProduct, rowY + 6, { width: 250 });
             
-            doc.font('Helvetica-Bold').fontSize(11);
-            doc.text(item.quantity.toString(), colQtyPedido + 10, rowY + 12);
+            doc.font('Helvetica-Bold').fontSize(10);
+            doc.text(item.quantity.toString(), colQtyPedido + 10, rowY + 6);
             doc.font('Helvetica').fontSize(9);
             
             // Campo vazio para preencher manualmente
-            doc.rect(colQtyConferido, rowY + 8, 40, 20).stroke();
+            doc.rect(colQtyConferido, rowY + 2, 35, 16).stroke();
 
-            doc.y = rowY + imgHeight + 5;
+            doc.y = rowY + imgHeight + 3;
           }
 
           doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();

@@ -84,6 +84,7 @@ export const products = pgTable("products", {
   stock: integer("stock").notNull().default(0),
   reservedStock: integer("reserved_stock").notNull().default(0),
   image: text("image"),
+  images: text("images").array(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
