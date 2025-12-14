@@ -686,20 +686,36 @@ async function handleProductEvent(data: WebhookProductData): Promise<{ success: 
   
   if (!fullProduct) {
     // Fallback to basic webhook data if API call fails
+    console.log(`Using fallback webhook data for product ${data.id}`);
+    
+    // Try to get category from webhook data
+    let categoryId: number | null = null;
+    if (data.categoria?.id) {
+      const existingCategories = await db.select().from(categories);
+      const matchingCategory = existingCategories.find(c => c.blingId === data.categoria?.id);
+      if (matchingCategory) {
+        categoryId = matchingCategory.id;
+        console.log(`Found category ${matchingCategory.name} (blingId: ${data.categoria.id}) for product ${sku}`);
+      } else {
+        console.log(`No matching category found for blingId ${data.categoria.id}`);
+      }
+    }
+    
     const productData: Partial<InsertProduct> = {
       name: data.nome,
       sku,
-      description: data.descricaoCurta || null,
+      categoryId,
+      description: data.descricaoCurta || data.descricaoComplementar || null,
       price: String(data.preco || 0),
     };
 
     const existing = await db.select().from(products).where(eq(products.sku, sku)).limit(1);
     if (existing.length === 0) {
       await db.insert(products).values(productData as InsertProduct);
-      return { success: true, message: `Product ${sku} created (basic data only)` };
+      return { success: true, message: `Product ${sku} created (webhook data, categoryId: ${categoryId})` };
     } else {
       await db.update(products).set(productData).where(eq(products.sku, sku));
-      return { success: true, message: `Product ${sku} updated (basic data only)` };
+      return { success: true, message: `Product ${sku} updated (webhook data, categoryId: ${categoryId})` };
     }
   }
 
