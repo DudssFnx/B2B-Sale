@@ -391,7 +391,7 @@ async function fetchProductDetailsWithRetry(productId: number): Promise<BlingPro
 
 export async function syncProducts(): Promise<{ created: number; updated: number; errors: string[] }> {
   const startTime = Date.now();
-  let productIds: number[] = [];
+  let basicProducts: BlingProductBasic[] = [];
   let page = 1;
   const limit = 100;
   
@@ -402,18 +402,16 @@ export async function syncProducts(): Promise<{ created: number; updated: number
     
     for (const p of pageProducts) {
       if (p.situacao === "A") {
-        productIds.push(p.id);
+        basicProducts.push(p);
       }
     }
     
     if (pageProducts.length < limit) break;
     page++;
+    await new Promise(resolve => setTimeout(resolve, 350));
   }
   
-  console.log(`Found ${productIds.length} active products. Fetching stock...`);
-  
-  const stockMap = await fetchBlingStock(productIds);
-  console.log(`Fetched stock for ${stockMap.size} products.`);
+  console.log(`Found ${basicProducts.length} active products.`);
 
   console.log("Fetching categories from Bling for mapping...");
   const blingCategories = await fetchBlingCategories();
@@ -433,12 +431,16 @@ export async function syncProducts(): Promise<{ created: number; updated: number
   });
   console.log(`Loaded ${Object.keys(categoryMap).length} local categories`);
 
-  console.log(`Fetching product details with 5 parallel workers...`);
+  console.log(`Fetching product details with 2 parallel workers (respecting rate limit)...`);
+  const productIds = basicProducts.map(p => p.id);
   const blingProducts = await runWithConcurrency(
     productIds,
-    fetchProductDetailsWithRetry,
-    5,
-    (done, total) => console.log(`Fetched ${done}/${total} product details...`)
+    async (id) => {
+      await new Promise(resolve => setTimeout(resolve, 400));
+      return fetchProductDetailsWithRetry(id);
+    },
+    2,
+    (done, total) => { if (done % 100 === 0) console.log(`Fetched ${done}/${total} product details...`); }
   );
   console.log(`Fetched all product details.`);
 
@@ -481,7 +483,7 @@ export async function syncProducts(): Promise<{ created: number; updated: number
       }
 
       const description = blingProduct.descricaoComplementar || blingProduct.descricaoCurta || null;
-      const stock = stockMap.get(productId) ?? blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
+      const stock = blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
 
       const productData: InsertProduct = {
         name: blingProduct.nome,
