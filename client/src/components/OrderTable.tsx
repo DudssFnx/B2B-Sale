@@ -189,7 +189,7 @@ export function OrderTable({
                           className="text-foreground"
                           data-testid={`button-invoice-${order.id}`}
                         >
-                          Faturar Pedido
+                          Finalizar Pedido
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuItem 

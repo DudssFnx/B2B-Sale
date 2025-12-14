@@ -764,7 +764,7 @@ export default function OrdersPage() {
                 onClick={() => handleBatchStatusChange('FATURADO')}
                 data-testid="batch-status-faturado"
               >
-                Faturar Pedido
+                Finalizar Pedido
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={() => handleBatchStatusChange('CANCELADO')}
