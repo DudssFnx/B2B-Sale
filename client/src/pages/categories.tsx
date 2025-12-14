@@ -1,10 +1,18 @@
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Package, Grid3X3, Box, Zap, Wrench, Coffee, Heart, Star, Bookmark, Layers, ShoppingBag, ChevronRight, ChevronDown, FolderTree } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Loader2, Package, Grid3X3, Box, Zap, Wrench, Coffee, Heart, Star, Bookmark, Layers, ShoppingBag, ChevronRight, ChevronDown, FolderTree, Plus, Edit, Trash2, EyeOff } from "lucide-react";
 import type { Category, Product } from "@shared/schema";
 
 const categoryIcons: Record<string, typeof Package> = {
@@ -95,16 +103,251 @@ function buildCategoryTree(
   return rootCategories;
 }
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '');
+}
+
+interface CategoryDialogProps {
+  category?: Category | null;
+  allCategories: Category[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}
+
+function CategoryDialog({ category, allCategories, open, onOpenChange, onSuccess }: CategoryDialogProps) {
+  const { toast } = useToast();
+  const [name, setName] = useState(category?.name || "");
+  const [slug, setSlug] = useState(category?.slug || "");
+  const [parentId, setParentId] = useState<string>(category?.parentId?.toString() || "none");
+  const [hideFromVarejo, setHideFromVarejo] = useState(category?.hideFromVarejo || false);
+  const [autoSlug, setAutoSlug] = useState(!category);
+
+  const isEdit = !!category;
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; slug: string; parentId: number | null; hideFromVarejo: boolean }) => {
+      return apiRequest('/api/categories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      toast({ title: "Categoria criada com sucesso" });
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao criar categoria", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async (data: { name: string; slug: string; parentId: number | null; hideFromVarejo: boolean }) => {
+      return apiRequest(`/api/categories/${category!.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      toast({ title: "Categoria atualizada com sucesso" });
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao atualizar categoria", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleNameChange = (value: string) => {
+    setName(value);
+    if (autoSlug) {
+      setSlug(slugify(value));
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim() || !slug.trim()) {
+      toast({ title: "Preencha nome e slug", variant: "destructive" });
+      return;
+    }
+
+    const data = {
+      name: name.trim(),
+      slug: slug.trim(),
+      parentId: parentId === "none" ? null : parseInt(parentId),
+      hideFromVarejo,
+    };
+
+    if (isEdit) {
+      updateMutation.mutate(data);
+    } else {
+      createMutation.mutate(data);
+    }
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
+  const availableParents = allCategories.filter(c => 
+    !category || (c.id !== category.id && c.parentId !== category.id)
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? "Editar Categoria" : "Nova Categoria"}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Nome</Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="Nome da categoria"
+              data-testid="input-category-name"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="slug">Slug (URL)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="slug"
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value);
+                  setAutoSlug(false);
+                }}
+                placeholder="slug-da-categoria"
+                data-testid="input-category-slug"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="parent">Categoria Pai (opcional)</Label>
+            <Select value={parentId} onValueChange={setParentId}>
+              <SelectTrigger data-testid="select-category-parent">
+                <SelectValue placeholder="Selecione a categoria pai" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Nenhuma (categoria principal)</SelectItem>
+                {availableParents.map((cat) => (
+                  <SelectItem key={cat.id} value={cat.id.toString()}>
+                    {cat.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="hideFromVarejo">Ocultar do Varejo</Label>
+              <p className="text-xs text-muted-foreground">
+                Categoria visivel apenas para atacado
+              </p>
+            </div>
+            <Switch
+              id="hideFromVarejo"
+              checked={hideFromVarejo}
+              onCheckedChange={setHideFromVarejo}
+              data-testid="switch-hide-varejo"
+            />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <DialogClose asChild>
+            <Button variant="outline" data-testid="button-cancel-category">Cancelar</Button>
+          </DialogClose>
+          <Button onClick={handleSubmit} disabled={isPending} data-testid="button-save-category">
+            {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {isEdit ? "Salvar" : "Criar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface DeleteDialogProps {
+  category: Category;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+}
+
+function DeleteCategoryDialog({ category, open, onOpenChange, onSuccess }: DeleteDialogProps) {
+  const { toast } = useToast();
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/categories/${category.id}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
+      toast({ title: "Categoria excluida com sucesso" });
+      onSuccess();
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao excluir categoria", description: error.message, variant: "destructive" });
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Excluir Categoria</DialogTitle>
+        </DialogHeader>
+        <p className="py-4">
+          Tem certeza que deseja excluir a categoria <strong>{category.name}</strong>?
+          Esta acao nao pode ser desfeita.
+        </p>
+        <DialogFooter className="gap-2">
+          <DialogClose asChild>
+            <Button variant="outline" data-testid="button-cancel-delete">Cancelar</Button>
+          </DialogClose>
+          <Button 
+            variant="destructive" 
+            onClick={() => deleteMutation.mutate()} 
+            disabled={deleteMutation.isPending}
+            data-testid="button-confirm-delete"
+          >
+            {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Excluir
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function CategoryCard({ 
   category, 
   depth = 0,
   expandedCategories,
-  toggleExpanded 
+  toggleExpanded,
+  isAdmin,
+  onEdit,
+  onDelete,
 }: { 
   category: CategoryWithHierarchy; 
   depth?: number;
   expandedCategories: Set<number>;
   toggleExpanded: (id: number) => void;
+  isAdmin: boolean;
+  onEdit: (cat: Category) => void;
+  onDelete: (cat: Category) => void;
 }) {
   const Icon = getCategoryIcon(category.slug);
   const bgGradient = getCategoryColor(category.slug);
@@ -134,27 +377,39 @@ function CategoryCard({
             )}
           </Button>
         )}
-        <Link 
-          href={`/catalog?category=${encodeURIComponent(category.name)}`} 
-          className={`block flex-1 ${!hasChildren ? (isSubcategory ? "" : "ml-11") : ""}`}
-          data-testid={`card-category-${category.id}`}
-        >
+        <div className={`flex-1 ${!hasChildren ? (isSubcategory ? "" : "ml-11") : ""}`}>
           <Card className="group overflow-visible hover-elevate active-elevate-2 transition-all duration-200">
             <CardContent className="p-0">
-              <div className={`relative ${isSubcategory ? "h-20" : "h-32"} bg-gradient-to-br ${bgGradient} rounded-t-lg overflow-hidden`}>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Icon className={`${isSubcategory ? "h-10 w-10" : "h-16 w-16"} ${iconColor} opacity-80 group-hover:scale-110 transition-transform duration-300`} />
+              <Link 
+                href={`/catalog?category=${encodeURIComponent(category.name)}`}
+                data-testid={`card-category-${category.id}`}
+              >
+                <div className={`relative ${isSubcategory ? "h-20" : "h-32"} bg-gradient-to-br ${bgGradient} rounded-t-lg overflow-hidden`}>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Icon className={`${isSubcategory ? "h-10 w-10" : "h-16 w-16"} ${iconColor} opacity-80 group-hover:scale-110 transition-transform duration-300`} />
+                  </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/20 to-transparent" />
+                  {category.hideFromVarejo && (
+                    <div className="absolute top-2 right-2">
+                      <Badge variant="secondary" className="text-xs gap-1">
+                        <EyeOff className="h-3 w-3" />
+                        Atacado
+                      </Badge>
+                    </div>
+                  )}
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/20 to-transparent" />
-              </div>
+              </Link>
               <div className="p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex-1">
+                  <Link 
+                    href={`/catalog?category=${encodeURIComponent(category.name)}`}
+                    className="min-w-0 flex-1"
+                  >
                     {isSubcategory && category.parentName && (
                       <p className="text-xs text-muted-foreground truncate">{category.parentName}</p>
                     )}
                     <h3 className="font-semibold text-base truncate">{category.name}</h3>
-                  </div>
+                  </Link>
                   <div className="flex items-center gap-2 shrink-0">
                     {hasChildren && (
                       <Badge variant="outline" className="text-xs">
@@ -166,17 +421,49 @@ function CategoryCard({
                     </Badge>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {category.productCount === 0 
-                    ? "Nenhum produto" 
-                    : category.productCount === 1 
-                      ? "1 produto disponivel" 
-                      : `${category.productCount} produtos disponiveis`}
-                </p>
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-xs text-muted-foreground">
+                    {category.productCount === 0 
+                      ? "Nenhum produto" 
+                      : category.productCount === 1 
+                        ? "1 produto disponivel" 
+                        : `${category.productCount} produtos disponiveis`}
+                  </p>
+                  {isAdmin && (
+                    <div className="flex items-center gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onEdit(category);
+                        }}
+                        data-testid={`button-edit-category-${category.id}`}
+                      >
+                        <Edit className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-destructive"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onDelete(category);
+                        }}
+                        data-testid={`button-delete-category-${category.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
-        </Link>
+        </div>
       </div>
 
       {hasChildren && isExpanded && (
@@ -188,6 +475,9 @@ function CategoryCard({
               depth={depth + 1}
               expandedCategories={expandedCategories}
               toggleExpanded={toggleExpanded}
+              isAdmin={isAdmin}
+              onEdit={onEdit}
+              onDelete={onDelete}
             />
           ))}
         </div>
@@ -197,8 +487,14 @@ function CategoryCard({
 }
 
 export default function CategoriesPage() {
+  const { user, isAdmin } = useAuth();
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<"hierarchy" | "flat">("hierarchy");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
+
+  const isVarejo = user?.customerType === "varejo";
 
   const { data: categoriesData = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -209,6 +505,13 @@ export default function CategoriesPage() {
   });
   
   const productsData = productsResponse?.products || [];
+
+  const filteredCategories = useMemo(() => {
+    if (isAdmin || !isVarejo) {
+      return categoriesData;
+    }
+    return categoriesData.filter(cat => !cat.hideFromVarejo);
+  }, [categoriesData, isAdmin, isVarejo]);
 
   const countMap = useMemo(() => {
     const map: Record<number, number> = {};
@@ -221,12 +524,12 @@ export default function CategoriesPage() {
   }, [productsData]);
 
   const categoryTree = useMemo(() => {
-    return buildCategoryTree(categoriesData, countMap);
-  }, [categoriesData, countMap]);
+    return buildCategoryTree(filteredCategories, countMap);
+  }, [filteredCategories, countMap]);
 
   const flatCategories = useMemo(() => {
-    return categoriesData.map((cat) => {
-      const parent = cat.parentId ? categoriesData.find(c => c.id === cat.parentId) : null;
+    return filteredCategories.map((cat) => {
+      const parent = cat.parentId ? filteredCategories.find(c => c.id === cat.parentId) : null;
       return {
         ...cat,
         productCount: countMap[cat.id] || 0,
@@ -235,7 +538,7 @@ export default function CategoriesPage() {
         fullPath: parent ? `${parent.name} > ${cat.name}` : cat.name,
       } as CategoryWithHierarchy;
     });
-  }, [categoriesData, countMap]);
+  }, [filteredCategories, countMap]);
 
   const toggleExpanded = (id: number) => {
     setExpandedCategories((prev) => {
@@ -250,8 +553,8 @@ export default function CategoriesPage() {
   };
 
   const expandAll = () => {
-    const allIds = new Set(categoriesData.filter(c => 
-      categoriesData.some(child => child.parentId === c.id)
+    const allIds = new Set(filteredCategories.filter(c => 
+      filteredCategories.some(child => child.parentId === c.id)
     ).map(c => c.id));
     setExpandedCategories(allIds);
   };
@@ -260,8 +563,22 @@ export default function CategoriesPage() {
     setExpandedCategories(new Set());
   };
 
+  const handleEdit = (category: Category) => {
+    setEditingCategory(category);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = (category: Category) => {
+    setDeletingCategory(category);
+  };
+
+  const handleCreateNew = () => {
+    setEditingCategory(null);
+    setDialogOpen(true);
+  };
+
   const rootCategoriesCount = categoryTree.length;
-  const subcategoriesCount = categoriesData.length - rootCategoriesCount;
+  const subcategoriesCount = filteredCategories.length - rootCategoriesCount;
   const totalProducts = productsData.length;
   const isLoading = categoriesLoading || productsLoading;
 
@@ -275,6 +592,12 @@ export default function CategoriesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && (
+            <Button onClick={handleCreateNew} data-testid="button-create-category">
+              <Plus className="h-4 w-4 mr-1" />
+              Nova Categoria
+            </Button>
+          )}
           <Button
             variant={viewMode === "hierarchy" ? "default" : "outline"}
             size="sm"
@@ -316,15 +639,21 @@ export default function CategoriesPage() {
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
           <p className="text-muted-foreground">Carregando categorias...</p>
         </div>
-      ) : categoriesData.length === 0 ? (
+      ) : filteredCategories.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
             <Grid3X3 className="h-10 w-10 text-muted-foreground/50" />
           </div>
           <h3 className="font-semibold text-lg mb-2">Nenhuma categoria cadastrada</h3>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-sm mb-4">
             As categorias serao exibidas aqui quando forem cadastradas
           </p>
+          {isAdmin && (
+            <Button onClick={handleCreateNew} data-testid="button-create-first-category">
+              <Plus className="h-4 w-4 mr-1" />
+              Criar primeira categoria
+            </Button>
+          )}
         </div>
       ) : viewMode === "hierarchy" ? (
         <div className="space-y-4">
@@ -334,6 +663,9 @@ export default function CategoriesPage() {
               category={category}
               expandedCategories={expandedCategories}
               toggleExpanded={toggleExpanded}
+              isAdmin={isAdmin}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
             />
           ))}
 
@@ -368,38 +700,81 @@ export default function CategoriesPage() {
             const iconColor = getCategoryIconColor(category.slug);
 
             return (
-              <Link key={category.id} href={`/catalog?category=${encodeURIComponent(category.name)}`} className="block" data-testid={`card-category-${category.id}`}>
+              <div key={category.id}>
                 <Card className="group overflow-visible hover-elevate active-elevate-2 transition-all duration-200">
                   <CardContent className="p-0">
-                    <div className={`relative h-32 bg-gradient-to-br ${bgGradient} rounded-t-lg overflow-hidden`}>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Icon className={`h-16 w-16 ${iconColor} opacity-80 group-hover:scale-110 transition-transform duration-300`} />
+                    <Link href={`/catalog?category=${encodeURIComponent(category.name)}`} data-testid={`card-category-${category.id}`}>
+                      <div className={`relative h-32 bg-gradient-to-br ${bgGradient} rounded-t-lg overflow-hidden`}>
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <Icon className={`h-16 w-16 ${iconColor} opacity-80 group-hover:scale-110 transition-transform duration-300`} />
+                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/20 to-transparent" />
+                        {category.hideFromVarejo && (
+                          <div className="absolute top-2 right-2">
+                            <Badge variant="secondary" className="text-xs gap-1">
+                              <EyeOff className="h-3 w-3" />
+                              Atacado
+                            </Badge>
+                          </div>
+                        )}
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/20 to-transparent" />
-                    </div>
+                    </Link>
                     <div className="p-4">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0 flex-1">
+                        <Link 
+                          href={`/catalog?category=${encodeURIComponent(category.name)}`}
+                          className="min-w-0 flex-1"
+                        >
                           {category.parentName && (
                             <p className="text-xs text-muted-foreground truncate">{category.parentName}</p>
                           )}
                           <h3 className="font-semibold text-base truncate">{category.name}</h3>
-                        </div>
+                        </Link>
                         <Badge variant="secondary" className="shrink-0">
                           {category.productCount}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {category.productCount === 0 
-                          ? "Nenhum produto" 
-                          : category.productCount === 1 
-                            ? "1 produto disponivel" 
-                            : `${category.productCount} produtos disponiveis`}
-                      </p>
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-xs text-muted-foreground">
+                          {category.productCount === 0 
+                            ? "Nenhum produto" 
+                            : category.productCount === 1 
+                              ? "1 produto disponivel" 
+                              : `${category.productCount} produtos disponiveis`}
+                        </p>
+                        {isAdmin && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleEdit(category);
+                              }}
+                              data-testid={`button-edit-category-${category.id}`}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-destructive"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDelete(category);
+                              }}
+                              data-testid={`button-delete-category-${category.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              </Link>
+              </div>
             );
           })}
 
@@ -428,7 +803,7 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {!isLoading && categoriesData.length > 0 && (
+      {!isLoading && filteredCategories.length > 0 && (
         <div className="mt-8">
           <Card>
             <CardContent className="p-4">
@@ -461,6 +836,23 @@ export default function CategoriesPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      <CategoryDialog
+        category={editingCategory}
+        allCategories={categoriesData}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSuccess={() => setEditingCategory(null)}
+      />
+
+      {deletingCategory && (
+        <DeleteCategoryDialog
+          category={deletingCategory}
+          open={!!deletingCategory}
+          onOpenChange={(open) => !open && setDeletingCategory(null)}
+          onSuccess={() => setDeletingCategory(null)}
+        />
       )}
     </div>
   );
