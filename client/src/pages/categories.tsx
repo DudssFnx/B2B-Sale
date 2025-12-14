@@ -376,22 +376,22 @@ function CategoryCard({
           </Button>
         )}
         <div className={`flex-1 ${!hasChildren ? (isSubcategory ? "" : "ml-11") : ""}`}>
-          <Card className="group overflow-visible hover-elevate active-elevate-2 transition-all duration-200">
+          <Card className={`group overflow-visible hover-elevate active-elevate-2 transition-all duration-200 ${category.hideFromVarejo ? 'ring-2 ring-red-500/50 dark:ring-red-400/50' : ''}`}>
             <CardContent className="p-0">
               <Link 
                 href={`/catalog?category=${encodeURIComponent(category.name)}`}
                 data-testid={`card-category-${category.id}`}
               >
-                <div className={`relative ${isSubcategory ? "h-20" : "h-32"} bg-gradient-to-br ${bgGradient} rounded-t-lg overflow-hidden`}>
+                <div className={`relative ${isSubcategory ? "h-20" : "h-32"} ${category.hideFromVarejo ? 'bg-gradient-to-br from-red-500/30 to-red-600/20 dark:from-red-500/20 dark:to-red-600/10' : `bg-gradient-to-br ${bgGradient}`} rounded-t-lg overflow-hidden`}>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Icon className={`${isSubcategory ? "h-10 w-10" : "h-16 w-16"} ${iconColor} opacity-80 group-hover:scale-110 transition-transform duration-300`} />
+                    <Icon className={`${isSubcategory ? "h-10 w-10" : "h-16 w-16"} ${category.hideFromVarejo ? 'text-red-500' : iconColor} opacity-80 group-hover:scale-110 transition-transform duration-300`} />
                   </div>
                   <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background/20 to-transparent" />
                   {category.hideFromVarejo && (
                     <div className="absolute top-2 right-2">
-                      <Badge variant="secondary" className="text-xs gap-1">
+                      <Badge variant="destructive" className="text-xs gap-1">
                         <EyeOff className="h-3 w-3" />
-                        Atacado
+                        Oculto Varejo
                       </Badge>
                     </div>
                   )}
