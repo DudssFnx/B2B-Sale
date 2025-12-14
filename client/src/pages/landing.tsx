@@ -1,321 +1,345 @@
-import { useState, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Phone, X, Users } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { 
+  Phone, 
+  Store, 
+  Search, 
+  Package,
+  ChevronRight,
+  Loader2,
+  ShoppingBag
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import type { Product as SchemaProduct, Category } from "@shared/schema";
 import logoImage from "@assets/image_1765659931449.png";
 import bannerImage from "@assets/image_1765667052902.png";
 
+interface ProductsResponse {
+  products: SchemaProduct[];
+  total: number;
+  page: number;
+  totalPages: number;
+}
+
 export default function LandingPage() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  
-  const [showEmployeeLogin, setShowEmployeeLogin] = useState(false);
-  const [employeeEmail, setEmployeeEmail] = useState("");
-  const [employeePassword, setEmployeePassword] = useState("");
-  const [showEmployeePassword, setShowEmployeePassword] = useState(false);
-  
-  const clickCountRef = useRef(0);
-  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string }) => {
-      const res = await apiRequest("POST", "/api/auth/login", data);
+  const { data: categoriesData = [], isLoading: categoriesLoading } = useQuery<Category[]>({
+    queryKey: ['/api/public/categories'],
+    queryFn: async () => {
+      const res = await fetch('/api/public/categories');
+      if (!res.ok) throw new Error('Failed to fetch categories');
       return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Redirecionando...",
-      });
-      setTimeout(() => {
-        window.location.href = "/catalog";
-      }, 500);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro no login",
-        description: error.message || "Verifique suas credenciais",
-        variant: "destructive",
-      });
     },
   });
 
-  const employeeLoginMutation = useMutation({
-    mutationFn: async (data: { email: string; password: string }) => {
-      const res = await apiRequest("POST", "/api/auth/login", data);
+  const { data: productsResponse, isLoading: productsLoading } = useQuery<ProductsResponse>({
+    queryKey: ['/api/public/products', 'featured'],
+    queryFn: async () => {
+      const res = await fetch('/api/public/products?limit=12');
+      if (!res.ok) throw new Error('Failed to fetch products');
       return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Login de funcionario realizado!",
-        description: "Redirecionando para o painel...",
-      });
-      setShowEmployeeLogin(false);
-      setTimeout(() => {
-        window.location.href = "/admin";
-      }, 500);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro no login",
-        description: error.message || "Credenciais invalidas",
-        variant: "destructive",
-      });
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      toast({
-        title: "Campos obrigatorios",
-        description: "Preencha email e senha",
-        variant: "destructive",
-      });
-      return;
-    }
-    loginMutation.mutate({ email, password });
-  };
+  const productsData = productsResponse?.products || [];
 
-  const handleEmployeeSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!employeeEmail || !employeePassword) {
-      toast({
-        title: "Campos obrigatorios",
-        description: "Preencha email e senha",
-        variant: "destructive",
-      });
-      return;
-    }
-    employeeLoginMutation.mutate({ email: employeeEmail, password: employeePassword });
-  };
-
-  const handleLogoClick = () => {
-    clickCountRef.current += 1;
-    
-    if (clickTimeoutRef.current) {
-      clearTimeout(clickTimeoutRef.current);
-    }
-    
-    if (clickCountRef.current >= 3) {
-      clickCountRef.current = 0;
-      setShowEmployeeLogin(true);
-    } else {
-      clickTimeoutRef.current = setTimeout(() => {
-        clickCountRef.current = 0;
-      }, 1000);
-    }
-  };
-
-  const handleForgotPassword = () => {
-    toast({
-      title: "Recuperacao de senha",
-      description: "Entre em contato pelo WhatsApp para recuperar sua senha",
+  const categoryMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    categoriesData.forEach(cat => {
+      map[cat.id] = cat.name;
     });
+    return map;
+  }, [categoriesData]);
+
+  const formatPrice = (price: string | number) => {
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL'
+    }).format(numPrice);
   };
 
-  const handleRequestAccess = () => {
-    setLocation("/register");
-  };
-
-  const handleViewCatalog = () => {
-    setLocation("/catalog");
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setLocation(`/catalogo?search=${encodeURIComponent(searchQuery)}`);
+    }
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row">
-      <div className="flex-1 bg-white dark:bg-background flex flex-col justify-center px-8 py-12 lg:px-16 lg:py-0">
-        <div className="max-w-md mx-auto w-full">
-          <div className="flex flex-col items-center mb-8">
-            <div
-              onClick={handleLogoClick}
-              className="select-none"
-              data-testid="button-logo-secret"
-            >
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="sticky top-0 z-50 bg-zinc-900 text-white">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <img 
                 src={logoImage} 
                 alt="Lojamadrugadao" 
-                className="h-20 w-20 rounded-full mb-4"
-                draggable={false}
+                className="h-12 w-12 rounded-full border-2 border-white/20"
                 data-testid="img-logo"
               />
-            </div>
-            <h1 className="text-xl font-bold text-foreground text-center" data-testid="text-title">
-              LOJAMADRUGADAO SAO PAULO
-            </h1>
-            <div className="flex items-center gap-2 text-muted-foreground mt-2">
-              <Phone className="h-4 w-4" />
-              <span className="text-sm" data-testid="text-phone">11 99294-0168</span>
-            </div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="sr-only">Email ou CPF/CNPJ</Label>
-              <Input
-                id="email"
-                type="text"
-                placeholder="Email ou CPF/CNPJ"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12"
-                data-testid="input-email"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="sr-only">Senha</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Senha"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 pr-10"
-                  data-testid="input-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  data-testid="button-toggle-password"
-                >
-                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+              <div className="hidden sm:block">
+                <h1 className="font-bold text-lg tracking-wide">LOJAMADRUGADAO</h1>
+                <div className="flex items-center gap-1 text-zinc-400 text-xs">
+                  <Phone className="h-3 w-3" />
+                  <span>11 99294-0168</span>
+                </div>
               </div>
             </div>
 
-            <Button
-              type="submit"
-              className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-semibold text-lg"
-              disabled={loginMutation.isPending}
-              data-testid="button-login"
-            >
-              {loginMutation.isPending ? "Entrando..." : "Acessar"}
-            </Button>
-          </form>
+            <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-md mx-4">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                <Input
+                  placeholder="Buscar produtos..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-zinc-800 border-zinc-700 text-white placeholder:text-zinc-500"
+                  data-testid="input-search"
+                />
+              </div>
+            </form>
 
-          <div className="flex items-center justify-between mt-6 text-sm">
-            <button
-              type="button"
-              onClick={handleForgotPassword}
-              className="text-primary hover:underline"
-              data-testid="link-forgot-password"
-            >
-              Esqueci minha senha
-            </button>
-            <button
-              type="button"
-              onClick={handleRequestAccess}
-              className="text-primary hover:underline"
-              data-testid="link-request-access"
-            >
-              Solicitar acesso
-            </button>
-          </div>
-
-          <div className="mt-12 pt-6 border-t border-border">
-            <button
-              type="button"
-              onClick={handleViewCatalog}
-              className="w-full text-center text-muted-foreground hover:text-foreground text-sm"
-              data-testid="link-view-catalog"
-            >
-              Continuar visualizando o catalogo sem precos
-            </button>
+            <div className="flex items-center gap-2">
+              <Button 
+                onClick={() => setLocation("/login")}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+                data-testid="button-atacado-login"
+              >
+                <Store className="h-4 w-4 mr-2" />
+                Atacado
+              </Button>
+              <ThemeToggle />
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="hidden lg:flex flex-1 relative overflow-hidden">
-        <img 
-          src={bannerImage} 
-          alt="Promocao BEM BOLADO 10% desconto" 
-          className="absolute inset-0 w-full h-full object-cover object-right"
-          data-testid="img-banner"
-        />
-      </div>
-
-      <div className="lg:hidden relative h-48 overflow-hidden">
-        <img 
-          src={bannerImage} 
-          alt="Promocao BEM BOLADO 10% desconto" 
-          className="w-full h-full object-cover object-right"
-          data-testid="img-banner-mobile"
-        />
-      </div>
-
-      <Dialog open={showEmployeeLogin} onOpenChange={setShowEmployeeLogin}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Acesso Funcionarios
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleEmployeeSubmit} className="space-y-4 mt-4">
-            <div className="space-y-2">
-              <Label htmlFor="employee-email">Email</Label>
-              <Input
-                id="employee-email"
-                type="email"
-                placeholder="email@empresa.com.br"
-                value={employeeEmail}
-                onChange={(e) => setEmployeeEmail(e.target.value)}
-                className="h-12"
-                data-testid="input-employee-email"
-              />
+      <section className="relative">
+        <div className="aspect-[21/9] md:aspect-[3/1] w-full overflow-hidden">
+          <img 
+            src={bannerImage} 
+            alt="Promocoes" 
+            className="w-full h-full object-cover"
+            data-testid="img-banner"
+          />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
+          <div className="container mx-auto px-4">
+            <div className="max-w-lg">
+              <h2 className="text-2xl md:text-4xl font-bold text-white mb-2">
+                Bem-vindo ao Madrugadao
+              </h2>
+              <p className="text-white/80 text-sm md:text-base mb-4">
+                Os melhores produtos com os melhores precos
+              </p>
+              <Button 
+                size="lg"
+                onClick={() => setLocation("/catalogo")}
+                className="bg-orange-500 hover:bg-orange-600"
+                data-testid="button-ver-catalogo"
+              >
+                <ShoppingBag className="h-5 w-5 mr-2" />
+                Ver Catalogo Completo
+              </Button>
             </div>
+          </div>
+        </div>
+      </section>
 
-            <div className="space-y-2">
-              <Label htmlFor="employee-password">Senha</Label>
-              <div className="relative">
-                <Input
-                  id="employee-password"
-                  type={showEmployeePassword ? "text" : "password"}
-                  placeholder="Senha"
-                  value={employeePassword}
-                  onChange={(e) => setEmployeePassword(e.target.value)}
-                  className="h-12 pr-10"
-                  data-testid="input-employee-password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowEmployeePassword(!showEmployeePassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  data-testid="button-toggle-employee-password"
+      <form onSubmit={handleSearch} className="md:hidden container mx-auto px-4 py-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar produtos..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+            data-testid="input-search-mobile"
+          />
+        </div>
+      </form>
+
+      {categoriesData.length > 0 && (
+        <section className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold">Categorias</h2>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setLocation("/catalogo")}
+              data-testid="button-ver-categorias"
+            >
+              Ver todas
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </div>
+          
+          {categoriesLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+              {categoriesData.slice(0, 10).map(category => (
+                <Button
+                  key={category.id}
+                  variant="outline"
+                  className="shrink-0 px-4"
+                  onClick={() => setLocation(`/catalogo?category=${encodeURIComponent(category.name)}`)}
+                  data-testid={`button-category-${category.id}`}
                 >
-                  {showEmployeePassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                </button>
+                  {category.name}
+                </Button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      <section className="container mx-auto px-4 py-6 flex-1">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold">Produtos em Destaque</h2>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setLocation("/catalogo")}
+            data-testid="button-ver-produtos"
+          >
+            Ver todos
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+
+        {productsLoading ? (
+          <div className="flex flex-col items-center justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Carregando produtos...</p>
+          </div>
+        ) : productsData.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-4">
+              <Package className="h-10 w-10 text-muted-foreground/50" />
+            </div>
+            <h3 className="font-semibold text-lg mb-2">Nenhum produto disponivel</h3>
+            <p className="text-muted-foreground text-sm">
+              Os produtos serao exibidos aqui quando forem cadastrados
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {productsData.map(product => (
+              <Card 
+                key={product.id}
+                className="overflow-hidden group hover-elevate transition-all duration-200 cursor-pointer"
+                onClick={() => setLocation("/catalogo")}
+                data-testid={`card-product-${product.id}`}
+              >
+                <div className="aspect-square bg-muted/30 flex items-center justify-center relative overflow-hidden">
+                  {product.image ? (
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <Package className="h-12 w-12 text-muted-foreground/20" />
+                  )}
+                  {product.stock === 0 && (
+                    <div className="absolute inset-0 bg-background/80 flex items-center justify-center backdrop-blur-sm">
+                      <Badge variant="destructive">Indisponivel</Badge>
+                    </div>
+                  )}
+                  {product.brand && (
+                    <div className="absolute top-1.5 left-1.5">
+                      <Badge variant="secondary" className="text-xs font-medium bg-background/90 backdrop-blur-sm">
+                        {product.brand}
+                      </Badge>
+                    </div>
+                  )}
+                </div>
+                <CardContent className="p-2">
+                  <p className="text-xs text-muted-foreground mb-0.5 font-mono">
+                    {product.sku}
+                  </p>
+                  <h3 className="font-medium text-xs line-clamp-2 min-h-[2rem] leading-tight mb-1">
+                    {product.name}
+                  </h3>
+                  <p className="text-sm font-bold text-primary" data-testid={`text-price-${product.id}`}>
+                    {formatPrice(product.price)}
+                  </p>
+                  {product.categoryId && categoryMap[product.categoryId] && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {categoryMap[product.categoryId]}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="bg-zinc-900 text-white py-12">
+        <div className="container mx-auto px-4">
+          <div className="text-center max-w-2xl mx-auto">
+            <h2 className="text-2xl font-bold mb-4">Quer precos de atacado?</h2>
+            <p className="text-zinc-400 mb-6">
+              Faca seu cadastro e tenha acesso a precos exclusivos para revendedores
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button 
+                size="lg"
+                onClick={() => setLocation("/register")}
+                className="bg-orange-500 hover:bg-orange-600"
+                data-testid="button-cadastrar"
+              >
+                Solicitar Cadastro
+              </Button>
+              <Button 
+                size="lg"
+                variant="outline"
+                onClick={() => setLocation("/login")}
+                className="border-zinc-700 text-white hover:bg-zinc-800"
+                data-testid="button-entrar"
+              >
+                Ja tenho cadastro
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t py-6 bg-background">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src={logoImage} 
+                alt="Lojamadrugadao" 
+                className="h-10 w-10 rounded-full"
+              />
+              <div>
+                <p className="font-semibold text-sm">LOJAMADRUGADAO SAO PAULO</p>
+                <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                  <Phone className="h-3 w-3" />
+                  <span>11 99294-0168</span>
+                </div>
               </div>
             </div>
-
-            <Button
-              type="submit"
-              className="w-full h-12"
-              disabled={employeeLoginMutation.isPending}
-              data-testid="button-employee-login"
-            >
-              {employeeLoginMutation.isPending ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+            <p className="text-xs text-muted-foreground">
+              Precos de varejo. Para precos de atacado, faca login.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
