@@ -282,9 +282,7 @@ function DeleteCategoryDialog({ category, open, onOpenChange, onSuccess }: Delet
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/categories/${category.id}`, {
-        method: 'DELETE',
-      });
+      return apiRequest('DELETE', `/api/categories/${category.id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/categories'] });
@@ -509,8 +507,6 @@ export default function CategoriesPage() {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [deletingCategory, setDeletingCategory] = useState<Category | null>(null);
 
-  const isVarejo = user?.customerType === "varejo";
-
   const { data: categoriesData = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
   });
@@ -522,11 +518,10 @@ export default function CategoriesPage() {
   const productsData = productsResponse?.products || [];
 
   const filteredCategories = useMemo(() => {
-    if (isAdmin || !isVarejo) {
-      return categoriesData;
-    }
-    return categoriesData.filter(cat => !cat.hideFromVarejo);
-  }, [categoriesData, isAdmin, isVarejo]);
+    // Admins and sales always see ALL categories (including hidden ones)
+    // This is the management panel - must show everything for proper management
+    return categoriesData;
+  }, [categoriesData]);
 
   const countMap = useMemo(() => {
     const map: Record<number, number> = {};
