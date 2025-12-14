@@ -267,6 +267,37 @@ async function blingApiRequest<T>(endpoint: string): Promise<T> {
   return response.json();
 }
 
+async function blingApiPost<T>(endpoint: string, body: unknown): Promise<T> {
+  const accessToken = await getValidAccessToken();
+  
+  const response = await fetch(`${BLING_API_BASE}${endpoint}`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Accept": "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (response.status === 401) {
+    try {
+      await refreshAccessToken();
+      return blingApiPost<T>(endpoint, body);
+    } catch {
+      throw new Error("Authentication failed. Please re-authorize with Bling.");
+    }
+  }
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`Bling API POST error for ${endpoint}:`, error);
+    throw new Error(`Bling API error: ${response.status} - ${error}`);
+  }
+
+  return response.json();
+}
+
 export async function fetchBlingProductsList(page: number = 1, limit: number = 100): Promise<BlingProductBasic[]> {
   const response = await blingApiRequest<{ data: BlingProductBasic[] }>(
     `/produtos?pagina=${page}&limite=${limit}&tipo=P&criterio=1`
@@ -973,4 +1004,88 @@ async function handleStockEvent(data: WebhookStockData): Promise<{ success: bool
   }
 
   return { success: true, message: `Product ${blingProductId} not found for stock update` };
+}
+
+// ========== ORDER CREATION ==========
+
+export interface BlingOrderItem {
+  codigo: string;
+  descricao: string;
+  quantidade: number;
+  valorUnidade: number;
+}
+
+export interface BlingOrderData {
+  orderNumber: string;
+  customerCpfCnpj?: string;
+  customerName?: string;
+  items: BlingOrderItem[];
+  frete?: number;
+  desconto?: number;
+  observacoes?: string;
+}
+
+interface BlingOrderResponse {
+  data: {
+    id: number;
+    numero?: string;
+  };
+}
+
+export async function createBlingOrder(orderData: BlingOrderData): Promise<{ success: boolean; blingId?: number; error?: string }> {
+  try {
+    const accessToken = process.env.BLING_ACCESS_TOKEN;
+    if (!accessToken) {
+      console.log("Bling not configured - skipping order sync");
+      return { success: false, error: "Bling not configured" };
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const blingPayload: any = {
+      data: today,
+      dataPrevista: today,
+      numeroLoja: orderData.orderNumber,
+      observacoes: orderData.observacoes || `Pedido #${orderData.orderNumber} do site`,
+      itens: orderData.items.map(item => ({
+        codigo: item.codigo,
+        descricao: item.descricao,
+        quantidade: item.quantidade,
+        valorUnidade: item.valorUnidade,
+      })),
+    };
+
+    if (orderData.customerCpfCnpj) {
+      const cleanDoc = orderData.customerCpfCnpj.replace(/\D/g, '');
+      blingPayload.contato = {
+        tipoPessoa: cleanDoc.length > 11 ? "J" : "F",
+        cpfCnpj: cleanDoc,
+        nome: orderData.customerName || "Cliente",
+      };
+    }
+
+    if (orderData.frete && orderData.frete > 0) {
+      blingPayload.transporte = {
+        valorFrete: orderData.frete,
+      };
+    }
+
+    if (orderData.desconto && orderData.desconto > 0) {
+      blingPayload.desconto = {
+        valor: orderData.desconto,
+        unidade: "REAL",
+      };
+    }
+
+    console.log("Sending order to Bling:", JSON.stringify(blingPayload, null, 2));
+
+    const response = await blingApiPost<BlingOrderResponse>("/pedidos/vendas", blingPayload);
+    
+    console.log("Bling order created successfully:", response.data.id);
+    return { success: true, blingId: response.data.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("Failed to create Bling order:", message);
+    return { success: false, error: message };
+  }
 }

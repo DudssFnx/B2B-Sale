@@ -538,7 +538,8 @@ export async function registerRoutes(
         isGuestOrder: false,
       });
       
-      // Create order items
+      // Create order items and collect for Bling
+      const blingItems: blingService.BlingOrderItem[] = [];
       for (const item of items) {
         const product = await storage.getProduct(item.productId);
         await storage.createOrderItem({
@@ -547,7 +548,30 @@ export async function registerRoutes(
           quantity: item.quantity,
           price: product!.price,
         });
+        blingItems.push({
+          codigo: product!.sku,
+          descricao: product!.name,
+          quantidade: item.quantity,
+          valorUnidade: parseFloat(product!.price),
+        });
       }
+      
+      // Send order to Bling (async, don't block response)
+      const user = await storage.getUser(userId);
+      blingService.createBlingOrder({
+        orderNumber: order.orderNumber,
+        customerCpfCnpj: user?.cnpj || user?.cpf || undefined,
+        customerName: user?.tradingName || user?.company || `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || undefined,
+        items: blingItems,
+        frete: finalShippingCost,
+        observacoes: notes || undefined,
+      }).then(result => {
+        if (result.success) {
+          console.log(`Order ${order.orderNumber} synced to Bling: ID ${result.blingId}`);
+        } else {
+          console.log(`Order ${order.orderNumber} Bling sync failed: ${result.error}`);
+        }
+      }).catch(err => console.error("Bling sync error:", err));
       
       const orderItems = await storage.getOrderItems(order.id);
       res.status(201).json({ ...order, items: orderItems });
@@ -616,7 +640,8 @@ export async function registerRoutes(
         guestPhone: guestPhone || null,
       });
       
-      // Create order items
+      // Create order items and collect for Bling
+      const blingItems: blingService.BlingOrderItem[] = [];
       for (const item of items) {
         const product = await storage.getProduct(item.productId);
         await storage.createOrderItem({
@@ -625,7 +650,29 @@ export async function registerRoutes(
           quantity: item.quantity,
           price: product!.price,
         });
+        blingItems.push({
+          codigo: product!.sku,
+          descricao: product!.name,
+          quantidade: item.quantity,
+          valorUnidade: parseFloat(product!.price),
+        });
       }
+      
+      // Send order to Bling (async, don't block response)
+      blingService.createBlingOrder({
+        orderNumber: order.orderNumber,
+        customerCpfCnpj: guestCpf?.replace(/\D/g, ''),
+        customerName: guestName || undefined,
+        items: blingItems,
+        frete: finalShippingCost,
+        observacoes: notes || undefined,
+      }).then(result => {
+        if (result.success) {
+          console.log(`Guest Order ${order.orderNumber} synced to Bling: ID ${result.blingId}`);
+        } else {
+          console.log(`Guest Order ${order.orderNumber} Bling sync failed: ${result.error}`);
+        }
+      }).catch(err => console.error("Bling sync error:", err));
       
       const orderItems = await storage.getOrderItems(order.id);
       res.status(201).json({ ...order, items: orderItems });
