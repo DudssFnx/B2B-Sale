@@ -1,10 +1,10 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "./StatusBadge";
-import { Eye, Printer, Check, DollarSign, FileText } from "lucide-react";
+import { StatusBadge, StageProgress, getNextStage, getStageLabel, STAGES, getStageIndex } from "./StatusBadge";
+import { Eye, Printer, Package, DollarSign, FileCheck, Search, Truck, Send, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export interface Order {
   id: string;
@@ -33,153 +33,99 @@ interface OrderTableProps {
   onSelectAll?: (selected: boolean) => void;
 }
 
-function getStageBadge(stage: string) {
-  switch (stage) {
-    case "PENDENTE_IMPRESSAO":
-      return (
-        <Badge 
-          variant="outline" 
-          className="bg-yellow-50 dark:bg-yellow-950/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800 text-xs"
-        >
-          Pendente Impressao
-        </Badge>
-      );
-    case "IMPRESSO":
-      return (
-        <Badge 
-          variant="outline" 
-          className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-xs gap-1"
-        >
-          <Check className="h-3 w-3" />
-          Impresso
-        </Badge>
-      );
-    case "SEPARADO":
-      return (
-        <Badge 
-          variant="outline" 
-          className="bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800 text-xs gap-1"
-        >
-          <Check className="h-3 w-3" />
-          Separado
-        </Badge>
-      );
+function getStageActionConfig(stage: string): { 
+  icon: typeof Printer; 
+  label: string; 
+  nextStage: string | null;
+  buttonVariant: "outline" | "default";
+} | null {
+  const normalizedStage = stage === "PENDENTE_IMPRESSAO" ? "AGUARDANDO_IMPRESSAO" :
+                          stage === "IMPRESSO" ? "PEDIDO_IMPRESSO" :
+                          stage === "SEPARADO" ? "PEDIDO_SEPARADO" :
+                          stage === "FINALIZADO" ? "PEDIDO_ENVIADO" : stage;
+  
+  switch (normalizedStage) {
+    case "AGUARDANDO_IMPRESSAO":
+      return { icon: Printer, label: "Imprimir", nextStage: "PEDIDO_IMPRESSO", buttonVariant: "outline" };
+    case "PEDIDO_IMPRESSO":
+      return { icon: Package, label: "Separar", nextStage: "PEDIDO_SEPARADO", buttonVariant: "default" };
+    case "PEDIDO_SEPARADO":
+      return { icon: DollarSign, label: "Cobrar", nextStage: "COBRADO", buttonVariant: "default" };
     case "COBRADO":
-      return (
-        <Badge 
-          variant="outline" 
-          className="bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 text-xs gap-1"
-        >
-          <Check className="h-3 w-3" />
-          Cobrado
-        </Badge>
-      );
-    case "FINALIZADO":
-      return (
-        <Badge 
-          variant="outline" 
-          className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 text-xs gap-1"
-        >
-          <Check className="h-3 w-3" />
-          Finalizado
-        </Badge>
-      );
+      return { icon: FileCheck, label: "Conferir Comprovante", nextStage: "CONFERIR_COMPROVANTE", buttonVariant: "default" };
+    case "CONFERIR_COMPROVANTE":
+      return { icon: Search, label: "Em Conferência", nextStage: "EM_CONFERENCIA", buttonVariant: "default" };
+    case "EM_CONFERENCIA":
+      return { icon: Truck, label: "Aguardar Envio", nextStage: "AGUARDANDO_ENVIO", buttonVariant: "default" };
+    case "AGUARDANDO_ENVIO":
+      return { icon: Send, label: "Enviar", nextStage: "PEDIDO_ENVIADO", buttonVariant: "default" };
+    case "PEDIDO_ENVIADO":
+      return null;
     default:
-      return <span className="text-xs text-muted-foreground">{stage || "-"}</span>;
+      return null;
   }
 }
 
-function getStageActions(
-  order: Order, 
-  onPrintOrder?: (order: Order) => void,
-  onReserveStock?: (order: Order) => void,
-  onUpdateStage?: (order: Order, stage: string) => void,
-  onInvoice?: (order: Order) => void
-) {
+function StageActions({ 
+  order, 
+  onPrintOrder,
+  onUpdateStage 
+}: { 
+  order: Order; 
+  onPrintOrder?: (order: Order) => void;
+  onUpdateStage?: (order: Order, stage: string) => void;
+}) {
   const { status, stage } = order;
 
   if (status === "CANCELADO" || status === "PEDIDO_CANCELADO") {
     return (
-      <Badge 
-        variant="outline" 
-        className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800 text-xs"
-      >
-        Cancelado
-      </Badge>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">Cancelado</span>
+      </div>
     );
   }
 
-  if (status === "FATURADO" || status === "PEDIDO_FATURADO") {
-    return getStageBadge("FINALIZADO");
-  }
+  const actionConfig = getStageActionConfig(stage);
+  const currentIndex = getStageIndex(stage);
+  const currentStageLabel = getStageLabel(stage);
 
-  switch (stage) {
-    case "PENDENTE_IMPRESSAO":
-      return (
-        <div className="flex items-center gap-2">
-          {getStageBadge(stage)}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => onPrintOrder?.(order)}
-            data-testid={`button-imprimir-${order.id}`}
-          >
-            <Printer className="h-3 w-3 mr-1" />
-            Imprimir
-          </Button>
-        </div>
-      );
-    case "IMPRESSO":
-      return (
-        <div className="flex items-center gap-2">
-          {getStageBadge(stage)}
-          <Button
-            variant="default"
-            size="sm"
-            className="bg-emerald-600 text-white font-semibold"
-            onClick={() => onReserveStock?.(order)}
-            data-testid={`button-separar-${order.id}`}
-          >
-            Eu Separei Pedido
-          </Button>
-        </div>
-      );
-    case "SEPARADO":
-      return (
-        <div className="flex items-center gap-2">
-          {getStageBadge(stage)}
-          <Button
-            variant="default"
-            size="sm"
-            className="bg-amber-600 text-white font-semibold"
-            onClick={() => onUpdateStage?.(order, "COBRADO")}
-            data-testid={`button-cobrar-${order.id}`}
-          >
-            <DollarSign className="h-3 w-3 mr-1" />
-            Cobrar
-          </Button>
-        </div>
-      );
-    case "COBRADO":
-      return (
-        <div className="flex items-center gap-2">
-          {getStageBadge(stage)}
-          <Button
-            variant="default"
-            size="sm"
-            onClick={() => onInvoice?.(order)}
-            data-testid={`button-faturar-${order.id}`}
-          >
-            <FileText className="h-3 w-3 mr-1" />
-            Faturar
-          </Button>
-        </div>
-      );
-    case "FINALIZADO":
-      return getStageBadge(stage);
-    default:
-      return getStageBadge(stage);
-  }
+  return (
+    <div className="flex items-center gap-3">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div className="flex items-center gap-1">
+            <StageProgress currentStage={stage} />
+          </div>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-xs">
+          <div className="text-xs space-y-1">
+            <p className="font-semibold">Etapa {currentIndex + 1} de {STAGES.length}</p>
+            <p>{currentStageLabel}</p>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+
+      {actionConfig && (
+        <Button
+          variant={actionConfig.buttonVariant}
+          size="sm"
+          onClick={() => {
+            if (actionConfig.nextStage === "PEDIDO_IMPRESSO" && onPrintOrder) {
+              onPrintOrder(order);
+            } else if (actionConfig.nextStage && onUpdateStage) {
+              onUpdateStage(order, actionConfig.nextStage);
+            }
+          }}
+          className="gap-1"
+          data-testid={`button-stage-${order.id}`}
+        >
+          <actionConfig.icon className="h-3 w-3" />
+          <span className="hidden sm:inline">{actionConfig.label}</span>
+          <ChevronRight className="h-3 w-3 sm:hidden" />
+        </Button>
+      )}
+    </div>
+  );
 }
 
 export function OrderTable({ 
@@ -252,7 +198,11 @@ export function OrderTable({
                 <StatusBadge status={order.status as any} />
               </TableCell>
               <TableCell>
-                {getStageActions(order, onPrintOrder, onReserveStock, onUpdateStage, onInvoice)}
+                <StageActions 
+                  order={order} 
+                  onPrintOrder={onPrintOrder}
+                  onUpdateStage={onUpdateStage}
+                />
               </TableCell>
               <TableCell className="text-right font-medium">
                 R$ {order.total.toFixed(2)}

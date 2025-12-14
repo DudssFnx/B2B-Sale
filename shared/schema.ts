@@ -96,17 +96,26 @@ export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
 
 // Orders table
-// Status flow (affects stock): ORCAMENTO -> PEDIDO_GERADO -> FATURADO
+// STATUS (affects stock - situação do pedido):
 // - ORCAMENTO: no stock impact
 // - PEDIDO_GERADO: stock RESERVED
 // - FATURADO: stock DEDUCTED + sent to ERP
-// Stage flow (operational workflow): PENDENTE_IMPRESSAO -> IMPRESSO -> SEPARADO -> COBRADO -> FINALIZADO
+//
+// STAGE (organizational - Kanban interno, NÃO afeta estoque):
+// 1. AGUARDANDO_IMPRESSAO - Inicial
+// 2. PEDIDO_IMPRESSO - Após impressão
+// 3. PEDIDO_SEPARADO - Após separação física  
+// 4. COBRADO - Após cobrança
+// 5. CONFERIR_COMPROVANTE - Aguardando validação
+// 6. EM_CONFERENCIA - Em conferência
+// 7. AGUARDANDO_ENVIO - Pronto para despacho
+// 8. PEDIDO_ENVIADO - Finalizado
 export const orders = pgTable("orders", {
   id: serial("id").primaryKey(),
   userId: varchar("user_id").references(() => users.id), // nullable for guest orders
   orderNumber: text("order_number").notNull().unique(),
   status: text("status").notNull().default("ORCAMENTO"),
-  stage: text("stage").notNull().default("PENDENTE_IMPRESSAO"),
+  stage: text("stage").notNull().default("AGUARDANDO_IMPRESSAO"),
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }),
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
