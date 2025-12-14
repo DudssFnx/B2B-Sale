@@ -130,7 +130,7 @@ export function OrderTable({
                   <Button
                     variant="default"
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase tracking-wide"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
                     onClick={() => onReserveStock ? onReserveStock(order) : onUpdateStatus?.(order, "PEDIDO_GERADO")}
                     data-testid={`button-separar-${order.id}`}
                   >
