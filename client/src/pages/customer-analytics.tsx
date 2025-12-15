@@ -14,7 +14,8 @@ import {
   BarChart3,
   UserPlus,
   RotateCcw,
-  Star
+  Star,
+  MapPin
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -83,6 +84,13 @@ interface CustomerAnalyticsData {
     days60: number;
     days90: number;
   };
+}
+
+interface LocationData {
+  totalCustomers: number;
+  customersWithLocation: number;
+  byState: { state: string; count: number; customers: { id: string; name: string; city: string | null }[] }[];
+  byCity: { city: string; state: string | null; count: number }[];
 }
 
 function formatCurrency(value: number): string {
@@ -341,6 +349,10 @@ export default function CustomerAnalyticsPage() {
     queryKey: ['/api/admin/customer-analytics'],
   });
 
+  const { data: locationData, isLoading: locationLoading } = useQuery<LocationData>({
+    queryKey: ['/api/admin/customers-by-location'],
+  });
+
   const rfmSummary = useMemo(() => {
     if (!analytics?.rfmSegments) return {};
     const summary: Record<string, number> = {};
@@ -484,6 +496,10 @@ export default function CustomerAnalyticsPage() {
               <TabsTrigger value="abc" data-testid="tab-abc">
                 <TrendingUp className="h-4 w-4 mr-2" />
                 Curva ABC
+              </TabsTrigger>
+              <TabsTrigger value="geography" data-testid="tab-geography">
+                <MapPin className="h-4 w-4 mr-2" />
+                Geografia
               </TabsTrigger>
             </TabsList>
 
@@ -676,6 +692,130 @@ export default function CustomerAnalyticsPage() {
                   </CardContent>
                 </Card>
               </div>
+            </TabsContent>
+
+            <TabsContent value="geography" className="space-y-4">
+              {locationLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-blue-500/10">
+                            <Users className="h-5 w-5 text-blue-500" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold" data-testid="stat-total-customers">
+                              {locationData?.totalCustomers || 0}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Total Clientes</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-green-500/10">
+                            <MapPin className="h-5 w-5 text-green-500" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold" data-testid="stat-with-location">
+                              {locationData?.customersWithLocation || 0}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Com Localização</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-purple-500/10">
+                            <BarChart3 className="h-5 w-5 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="text-2xl font-bold" data-testid="stat-states-count">
+                              {locationData?.byState.filter(s => s.state !== 'Não informado').length || 0}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Estados</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="grid lg:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">Clientes por Estado</CardTitle>
+                        <CardDescription>Distribuição geográfica por UF</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {locationData?.byState && locationData.byState.length > 0 ? (
+                          <div className="space-y-2">
+                            {locationData.byState.map((item) => (
+                              <div key={item.state} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`row-state-${item.state}`}>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline">{item.state}</Badge>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                  <div className="w-32 bg-muted rounded-full h-2 overflow-hidden">
+                                    <div 
+                                      className="bg-blue-500 h-full rounded-full" 
+                                      style={{ width: `${Math.min(100, (item.count / (locationData.totalCustomers || 1)) * 100 * 3)}%` }}
+                                    />
+                                  </div>
+                                  <span className="font-medium text-sm w-12 text-right">{item.count}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p>Nenhum dado de localização</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-lg">Top 20 Cidades</CardTitle>
+                        <CardDescription>Cidades com mais clientes</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {locationData?.byCity && locationData.byCity.length > 0 ? (
+                          <div className="space-y-2">
+                            {locationData.byCity.map((item, idx) => (
+                              <div key={`${item.city}-${item.state}`} className="flex items-center justify-between py-2 border-b last:border-0" data-testid={`row-city-${idx}`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-sm w-6">{idx + 1}.</span>
+                                  <span className="font-medium">{item.city}</span>
+                                  {item.state && <Badge variant="secondary" className="text-xs">{item.state}</Badge>}
+                                </div>
+                                <span className="font-medium text-sm">{item.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 text-muted-foreground">
+                            <MapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p>Nenhum dado de cidade</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
             </TabsContent>
           </Tabs>
         </>

@@ -997,6 +997,54 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/customers-by-location', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const allUsers = await storage.getUsers();
+      const customers = allUsers.filter(u => u.role === 'customer');
+      
+      const byState: Record<string, { count: number; customers: { id: string; name: string; city: string | null }[] }> = {};
+      const cityMap: Map<string, { city: string; state: string | null; count: number }> = new Map();
+      
+      for (const customer of customers) {
+        const state = customer.state || 'Não informado';
+        const city = customer.city || 'Não informado';
+        const name = customer.tradingName || customer.company || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email || 'Cliente';
+        
+        if (!byState[state]) {
+          byState[state] = { count: 0, customers: [] };
+        }
+        byState[state].count++;
+        byState[state].customers.push({ id: customer.id, name, city: customer.city });
+        
+        const cityKey = JSON.stringify({ city, state });
+        const existing = cityMap.get(cityKey);
+        if (existing) {
+          existing.count++;
+        } else {
+          cityMap.set(cityKey, { city, state: customer.state, count: 1 });
+        }
+      }
+      
+      const statesSorted = Object.entries(byState)
+        .map(([state, data]) => ({ state, ...data }))
+        .sort((a, b) => b.count - a.count);
+      
+      const citiesSorted = Array.from(cityMap.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 20);
+      
+      res.json({
+        totalCustomers: customers.length,
+        customersWithLocation: customers.filter(c => c.state || c.city).length,
+        byState: statesSorted,
+        byCity: citiesSorted,
+      });
+    } catch (error) {
+      console.error("Error fetching customers by location:", error);
+      res.status(500).json({ message: "Failed to fetch customers by location" });
+    }
+  });
+
   app.get('/api/admin/product-analytics', isAuthenticated, isAdminOrSales, async (req: any, res) => {
     try {
       const analytics = await storage.getProductAnalytics();
