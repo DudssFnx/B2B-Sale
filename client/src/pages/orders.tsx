@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Download, RefreshCw, Loader2, Package, Eye, Plus, Trash2, Search, X, User as UserIcon, Printer, Edit2 } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -37,6 +38,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+const STORE_WHATSAPP = "5511992845596";
+
+function getWhatsAppLink(orderNumber: string): string {
+  const message = `Olá! Gostaria de falar sobre o pedido #${orderNumber}`;
+  return `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(message)}`;
+}
 
 interface OrderWithItems extends SchemaOrder {
   items?: { id: number; quantity: number }[];
@@ -550,12 +558,29 @@ export default function OrdersPage() {
                       <p className="font-semibold text-lg">R$ {order.total.toFixed(2)}</p>
                       <p className="text-sm text-muted-foreground">{order.itemCount} itens</p>
                     </div>
-                    <Link href={`/orders/${order.id}`}>
-                      <Button variant="outline" size="sm" data-testid={`button-view-order-${order.id}`}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver detalhes
-                      </Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href={`/orders/${order.id}`}>
+                        <Button variant="outline" size="sm" data-testid={`button-view-order-${order.id}`}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver detalhes
+                        </Button>
+                      </Link>
+                      <a 
+                        href={getWhatsAppLink(order.orderNumber)} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="text-green-600 dark:text-green-500 border-green-600 dark:border-green-500"
+                          data-testid={`button-whatsapp-order-${order.id}`}
+                        >
+                          <SiWhatsapp className="h-4 w-4 mr-2" />
+                          WhatsApp
+                        </Button>
+                      </a>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

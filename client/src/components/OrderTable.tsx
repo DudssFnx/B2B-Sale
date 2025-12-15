@@ -2,8 +2,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { StatusBadge, StageBadge } from "./StatusBadge";
 import { Eye, Printer, Edit2 } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import { Link } from "wouter";
 import { Checkbox } from "@/components/ui/checkbox";
+
+const STORE_WHATSAPP = "5511992845596";
+
+function getWhatsAppLink(order: Order): string {
+  const message = `Olá! Gostaria de falar sobre o pedido #${order.orderNumber}`;
+  return `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(message)}`;
+}
 
 export interface Order {
   id: string;
@@ -135,6 +143,20 @@ export function OrderTable({
                       <Eye className="h-4 w-4" />
                     </Button>
                   </Link>
+                  <a 
+                    href={getWhatsAppLink(order)} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-green-600 dark:text-green-500"
+                      data-testid={`button-whatsapp-order-${order.id}`}
+                    >
+                      <SiWhatsapp className="h-4 w-4" />
+                    </Button>
+                  </a>
                 </div>
               </TableCell>
             </TableRow>

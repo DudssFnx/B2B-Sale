@@ -24,10 +24,14 @@ import {
   Phone,
   MapPin,
   Calculator,
-  Loader2
+  Loader2,
+  CheckCircle2
 } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import logoImage from "@assets/image_1765659931449.png";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+const STORE_WHATSAPP = "5511992845596";
 
 type CheckoutStep = "resumo" | "cadastro" | "frete" | "pagamento" | "orcamento";
 
@@ -90,6 +94,10 @@ export default function CheckoutPage() {
   const [guestName, setGuestName] = useState("");
   const [guestPhone, setGuestPhone] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  
+  // Success state
+  const [orderSuccess, setOrderSuccess] = useState(false);
+  const [createdOrderNumber, setCreatedOrderNumber] = useState("");
 
   // Handle step from URL query parameter (after login/register redirect)
   useEffect(() => {
@@ -304,19 +312,20 @@ export default function CheckoutPage() {
       }
 
       const endpoint = isGuestCheckout ? "/api/orders/guest" : "/api/orders";
-      await apiRequest("POST", endpoint, orderData);
+      const response = await apiRequest("POST", endpoint, orderData);
+      const orderResult = await response.json();
       
-      // Clear cart and redirect
+      // Clear cart and show success screen
       clearCart();
       queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      
+      setCreatedOrderNumber(orderResult.orderNumber || "");
+      setOrderSuccess(true);
       
       toast({
         title: "Orcamento gerado com sucesso!",
         description: "Entraremos em contato em breve",
       });
-      
-      // Guest users go to catalog, logged users go to account
-      setLocation(isGuestCheckout ? "/catalogo" : "/minha-conta");
     } catch (error) {
       toast({
         title: "Erro ao gerar orcamento",
@@ -327,6 +336,65 @@ export default function CheckoutPage() {
       setIsSubmitting(false);
     }
   };
+
+  // Success screen after order creation
+  if (orderSuccess) {
+    const whatsappMessage = `Olá! Acabei de gerar o orçamento #${createdOrderNumber} e gostaria de mais informações.`;
+    const whatsappLink = `https://wa.me/${STORE_WHATSAPP}?text=${encodeURIComponent(whatsappMessage)}`;
+    
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-50 bg-zinc-900 text-white">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3 cursor-pointer" onClick={() => setLocation("/")}>
+                <img 
+                  src={logoImage} 
+                  alt="Lojamadrugadao" 
+                  className="h-10 w-10 rounded-full border-2 border-white/20"
+                />
+                <h1 className="font-bold text-lg">LOJAMADRUGADAO</h1>
+              </div>
+              <ThemeToggle />
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6 text-center">
+              <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4" />
+              <h2 className="text-xl font-semibold mb-2">Orcamento Gerado!</h2>
+              {createdOrderNumber && (
+                <p className="text-2xl font-bold text-primary mb-2">#{createdOrderNumber}</p>
+              )}
+              <p className="text-muted-foreground mb-6">
+                Seu orcamento foi gerado com sucesso. Entre em contato conosco pelo WhatsApp para finalizar seu pedido.
+              </p>
+              <div className="flex flex-col gap-3">
+                <a href={whatsappLink} target="_blank" rel="noopener noreferrer">
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="button-whatsapp-order"
+                  >
+                    <SiWhatsapp className="h-5 w-5 mr-2" />
+                    Falar no WhatsApp
+                  </Button>
+                </a>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setLocation(isGuestCheckout ? "/catalogo" : "/minha-conta")}
+                  data-testid="button-continue-shopping"
+                >
+                  {isGuestCheckout ? "Voltar ao Catalogo" : "Ver Meus Pedidos"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (items.length === 0 && currentStep !== "orcamento") {
     return (
