@@ -32,6 +32,7 @@ import {
   TrendingUp,
   ChevronRight,
   ExternalLink,
+  ShoppingCart,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 type UserRole = "admin" | "sales" | "customer";
@@ -70,6 +71,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
         { title: "Visão Geral", url: "/", icon: LayoutDashboard },
         { title: "Análise de Clientes", url: "/customer-analytics", icon: BarChart3 },
         { title: "Análise de Produtos", url: "/product-analytics", icon: TrendingUp },
+        { title: "Compras", url: "/purchases", icon: ShoppingCart },
       ]
     },
     { title: "Categorias", url: "/categories", icon: Grid3X3 },

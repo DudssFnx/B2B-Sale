@@ -99,6 +99,9 @@ export interface IStorage {
   // Product Analytics
   getProductAnalytics(): Promise<ProductAnalyticsData>;
 
+  // Purchases Analytics (for purchasing/restocking decisions)
+  getPurchasesAnalytics(): Promise<PurchasesAnalyticsData>;
+
   // Stock Management
   reserveStockForOrder(orderId: number, userId: string): Promise<{ success: boolean; error?: string }>;
   releaseStockForOrder(orderId: number): Promise<{ success: boolean; error?: string }>;
@@ -300,6 +303,73 @@ export interface ProductAnalyticsData {
   crossSell: ProductCrossSell[];
   categoryPerformance: CategoryPerformance[];
   problematicProducts: ProblematicProduct[];
+}
+
+// Purchases Analytics Types (for purchasing/restocking decisions)
+export interface LowStockProduct {
+  productId: number;
+  name: string;
+  sku: string;
+  categoryName: string | null;
+  currentStock: number;
+  reservedStock: number;
+  availableStock: number;
+  avgDailySales: number;
+  daysOfStock: number;
+  suggestedPurchaseQty: number;
+  urgency: 'critical' | 'high' | 'medium' | 'low';
+}
+
+export interface SlowMovingProduct {
+  productId: number;
+  name: string;
+  sku: string;
+  categoryName: string | null;
+  currentStock: number;
+  stockValue: number;
+  daysSinceLastSale: number;
+  totalSalesLast90Days: number;
+  avgDailySales: number;
+  recommendation: string;
+}
+
+export interface FastMovingProduct {
+  productId: number;
+  name: string;
+  sku: string;
+  categoryName: string | null;
+  currentStock: number;
+  avgDailySales: number;
+  daysOfStock: number;
+  salesLast30Days: number;
+  growthPercent: number;
+  suggestedPurchaseQty: number;
+}
+
+export interface PurchaseSuggestion {
+  productId: number;
+  name: string;
+  sku: string;
+  categoryName: string | null;
+  currentStock: number;
+  suggestedQty: number;
+  estimatedCost: number;
+  reason: string;
+  priority: 'urgent' | 'high' | 'normal';
+}
+
+export interface PurchasesAnalyticsData {
+  overview: {
+    totalLowStockProducts: number;
+    totalSlowMovingProducts: number;
+    totalFastMovingProducts: number;
+    estimatedPurchaseValue: number;
+    criticalItems: number;
+  };
+  lowStock: LowStockProduct[];
+  slowMoving: SlowMovingProduct[];
+  fastMoving: FastMovingProduct[];
+  suggestions: PurchaseSuggestion[];
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1758,6 +1828,225 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       return { success: false, error: 'Erro ao atualizar etapa' };
     }
+  }
+
+  async getPurchasesAnalytics(): Promise<PurchasesAnalyticsData> {
+    const now = new Date();
+    const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const days60Ago = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const days90Ago = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    const allProducts = await db.select().from(products).where(eq(products.active, true));
+    const allCategories = await db.select().from(categories);
+    const faturadoOrders = await db.select().from(orders).where(eq(orders.status, 'FATURADO'));
+    const faturadoOrderIds = new Set(faturadoOrders.map(o => o.id));
+    const allOrderItems = (await db.select().from(orderItems)).filter(item => faturadoOrderIds.has(item.orderId));
+
+    const categoryMap = new Map<number, string>();
+    for (const cat of allCategories) {
+      categoryMap.set(cat.id, cat.name);
+    }
+
+    const orderDateMap = new Map<number, Date>();
+    for (const order of faturadoOrders) {
+      orderDateMap.set(order.id, new Date(order.createdAt));
+    }
+
+    interface ProductSalesData {
+      productId: number;
+      totalQuantity30d: number;
+      totalQuantity60d: number;
+      totalQuantity90d: number;
+      lastSaleDate: Date | null;
+      salesDates: Date[];
+    }
+
+    const salesDataMap = new Map<number, ProductSalesData>();
+
+    for (const item of allOrderItems) {
+      const orderDate = orderDateMap.get(item.orderId);
+      if (!orderDate) continue;
+
+      const existing = salesDataMap.get(item.productId) || {
+        productId: item.productId,
+        totalQuantity30d: 0,
+        totalQuantity60d: 0,
+        totalQuantity90d: 0,
+        lastSaleDate: null,
+        salesDates: [],
+      };
+
+      if (orderDate >= days30Ago) {
+        existing.totalQuantity30d += item.quantity;
+      }
+      if (orderDate >= days60Ago) {
+        existing.totalQuantity60d += item.quantity;
+      }
+      if (orderDate >= days90Ago) {
+        existing.totalQuantity90d += item.quantity;
+      }
+      existing.salesDates.push(orderDate);
+      if (!existing.lastSaleDate || orderDate > existing.lastSaleDate) {
+        existing.lastSaleDate = orderDate;
+      }
+
+      salesDataMap.set(item.productId, existing);
+    }
+
+    const lowStock: LowStockProduct[] = [];
+    const slowMoving: SlowMovingProduct[] = [];
+    const fastMoving: FastMovingProduct[] = [];
+    const suggestions: PurchaseSuggestion[] = [];
+
+    for (const product of allProducts) {
+      const salesData = salesDataMap.get(product.id);
+      const categoryName = product.categoryId ? categoryMap.get(product.categoryId) || null : null;
+      
+      const avgDailySales30d = salesData ? salesData.totalQuantity30d / 30 : 0;
+      const avgDailySales60d = salesData ? salesData.totalQuantity60d / 60 : 0;
+      const avgDailySales90d = salesData ? salesData.totalQuantity90d / 90 : 0;
+      const avgDailySales = Math.max(avgDailySales30d, avgDailySales60d, avgDailySales90d);
+      
+      const availableStock = product.stock - (product.reservedStock || 0);
+      const daysOfStock = avgDailySales > 0 ? Math.floor(availableStock / avgDailySales) : availableStock > 0 ? 999 : 0;
+      
+      const daysSinceLastSale = salesData?.lastSaleDate 
+        ? Math.floor((now.getTime() - salesData.lastSaleDate.getTime()) / (24 * 60 * 60 * 1000))
+        : 999;
+
+      // Low stock logic - products that need replenishment
+      if (avgDailySales > 0 && daysOfStock <= 30) {
+        let urgency: 'critical' | 'high' | 'medium' | 'low' = 'low';
+        if (daysOfStock <= 3) urgency = 'critical';
+        else if (daysOfStock <= 7) urgency = 'high';
+        else if (daysOfStock <= 14) urgency = 'medium';
+
+        const suggestedPurchaseQty = Math.ceil(avgDailySales * 30) - availableStock;
+
+        lowStock.push({
+          productId: product.id,
+          name: product.name,
+          sku: product.sku,
+          categoryName,
+          currentStock: product.stock,
+          reservedStock: product.reservedStock || 0,
+          availableStock,
+          avgDailySales: Math.round(avgDailySales * 100) / 100,
+          daysOfStock,
+          suggestedPurchaseQty: Math.max(0, suggestedPurchaseQty),
+          urgency,
+        });
+
+        if (urgency === 'critical' || urgency === 'high') {
+          suggestions.push({
+            productId: product.id,
+            name: product.name,
+            sku: product.sku,
+            categoryName,
+            currentStock: product.stock,
+            suggestedQty: Math.max(0, suggestedPurchaseQty),
+            estimatedCost: Math.max(0, suggestedPurchaseQty) * parseFloat(product.wholesalePrice),
+            reason: urgency === 'critical' 
+              ? `Estoque critico - apenas ${daysOfStock} dias de estoque` 
+              : `Estoque baixo - ${daysOfStock} dias de estoque`,
+            priority: urgency === 'critical' ? 'urgent' : 'high',
+          });
+        }
+      }
+
+      // Slow moving logic - products with stock but low sales
+      const stockValue = product.stock * parseFloat(product.wholesalePrice);
+      if (product.stock > 0 && (daysSinceLastSale > 30 || avgDailySales90d < 0.1)) {
+        let recommendation = '';
+        if (daysSinceLastSale > 60) {
+          recommendation = 'Considerar promocao ou liquidacao';
+        } else if (daysSinceLastSale > 30) {
+          recommendation = 'Revisar estrategia de vendas';
+        } else if (avgDailySales90d < 0.1) {
+          recommendation = 'Produto com giro muito lento';
+        }
+
+        slowMoving.push({
+          productId: product.id,
+          name: product.name,
+          sku: product.sku,
+          categoryName,
+          currentStock: product.stock,
+          stockValue: Math.round(stockValue * 100) / 100,
+          daysSinceLastSale,
+          totalSalesLast90Days: salesData?.totalQuantity90d || 0,
+          avgDailySales: Math.round(avgDailySales90d * 100) / 100,
+          recommendation,
+        });
+      }
+
+      // Fast moving logic - products selling well that need restocking
+      const prev30to60Sales = salesData ? salesData.totalQuantity60d - salesData.totalQuantity30d : 0;
+      const growthPercent = prev30to60Sales > 0 
+        ? ((salesData?.totalQuantity30d || 0) - prev30to60Sales) / prev30to60Sales * 100 
+        : salesData?.totalQuantity30d ? 100 : 0;
+
+      if (avgDailySales30d >= 1 || (avgDailySales30d >= 0.5 && growthPercent > 20)) {
+        const suggestedPurchaseQty = Math.ceil(avgDailySales30d * 45) - availableStock;
+        
+        fastMoving.push({
+          productId: product.id,
+          name: product.name,
+          sku: product.sku,
+          categoryName,
+          currentStock: product.stock,
+          avgDailySales: Math.round(avgDailySales30d * 100) / 100,
+          daysOfStock,
+          salesLast30Days: salesData?.totalQuantity30d || 0,
+          growthPercent: Math.round(growthPercent * 10) / 10,
+          suggestedPurchaseQty: Math.max(0, suggestedPurchaseQty),
+        });
+
+        if (daysOfStock <= 14 && suggestedPurchaseQty > 0) {
+          suggestions.push({
+            productId: product.id,
+            name: product.name,
+            sku: product.sku,
+            categoryName,
+            currentStock: product.stock,
+            suggestedQty: suggestedPurchaseQty,
+            estimatedCost: suggestedPurchaseQty * parseFloat(product.wholesalePrice),
+            reason: `Produto com alta demanda - ${salesData?.totalQuantity30d || 0} vendas nos ultimos 30 dias`,
+            priority: daysOfStock <= 7 ? 'urgent' : 'normal',
+          });
+        }
+      }
+    }
+
+    // Sort arrays
+    lowStock.sort((a, b) => {
+      const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+      return urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    });
+
+    slowMoving.sort((a, b) => b.stockValue - a.stockValue);
+    fastMoving.sort((a, b) => b.avgDailySales - a.avgDailySales);
+    suggestions.sort((a, b) => {
+      const priorityOrder = { urgent: 0, high: 1, normal: 2 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+
+    const estimatedPurchaseValue = suggestions.reduce((sum, s) => sum + s.estimatedCost, 0);
+    const criticalItems = lowStock.filter(p => p.urgency === 'critical').length;
+
+    return {
+      overview: {
+        totalLowStockProducts: lowStock.length,
+        totalSlowMovingProducts: slowMoving.length,
+        totalFastMovingProducts: fastMoving.length,
+        estimatedPurchaseValue: Math.round(estimatedPurchaseValue * 100) / 100,
+        criticalItems,
+      },
+      lowStock: lowStock.slice(0, 50),
+      slowMoving: slowMoving.slice(0, 50),
+      fastMoving: fastMoving.slice(0, 50),
+      suggestions: suggestions.slice(0, 30),
+    };
   }
 }
 
