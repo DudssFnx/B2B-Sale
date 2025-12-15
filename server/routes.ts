@@ -1213,7 +1213,12 @@ export async function registerRoutes(
       const filename = `public/products/${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
 
       const objectStorage = await getObjectStorage();
-      await objectStorage.uploadFromBytes(filename, file.buffer);
+      
+      // Convert Node.js Buffer to Uint8Array for object storage compatibility
+      console.log('[UPLOAD] File size:', file.buffer.length, 'bytes');
+      const uint8Array = new Uint8Array(file.buffer.buffer, file.buffer.byteOffset, file.buffer.length);
+      await objectStorage.uploadFromBytes(filename, uint8Array);
+      console.log('[UPLOAD] File uploaded successfully:', filename);
 
       const publicUrl = `/api/files/${filename}`;
       
