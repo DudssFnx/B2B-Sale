@@ -200,7 +200,7 @@ export default function PurchasesDashboardPage() {
                       <div className="text-right">
                         <p className="text-sm">Estoque: <span className="font-semibold">{item.currentStock}</span></p>
                         <p className="text-sm">Sugerido: <span className="font-semibold text-primary">{item.suggestedQty} un.</span></p>
-                        <p className="text-sm text-muted-foreground">Est.: R$ {item.estimatedCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                        <p className="text-sm text-muted-foreground">Est.: R$ {(item.estimatedCost ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                       </div>
                     </div>
                   ))}
