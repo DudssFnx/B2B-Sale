@@ -30,6 +30,7 @@ import OrderDetailsPage from "@/pages/order-details";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import ProductAnalyticsPage from "@/pages/product-analytics";
 import PurchasesDashboardPage from "@/pages/purchases-dashboard";
+import EmployeeAnalyticsPage from "@/pages/employee-analytics";
 import PublicCatalogPage from "@/pages/public-catalog";
 import CheckoutPage from "@/pages/checkout";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
@@ -104,6 +105,7 @@ function AuthenticatedApp() {
               {isAdmin && <Route path="/coupons" component={CouponsPage} />}
               {isAdmin && <Route path="/customer-analytics" component={CustomerAnalyticsPage} />}
               {isAdmin && <Route path="/product-analytics" component={ProductAnalyticsPage} />}
+              {isAdmin && <Route path="/employee-analytics" component={EmployeeAnalyticsPage} />}
               {isAdmin && <Route path="/purchases" component={PurchasesDashboardPage} />}
               <Route component={NotFound} />
             </Switch>

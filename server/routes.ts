@@ -997,6 +997,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get('/api/admin/employee-analytics', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const analytics = await storage.getEmployeeAnalytics();
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching employee analytics:", error);
+      res.status(500).json({ message: "Failed to fetch employee analytics" });
+    }
+  });
+
   app.get('/api/admin/customers-by-location', isAuthenticated, isAdminOrSales, async (req: any, res) => {
     try {
       const allUsers = await storage.getUsers();

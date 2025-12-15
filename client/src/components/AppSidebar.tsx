@@ -71,6 +71,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
         { title: "Visão Geral", url: "/", icon: LayoutDashboard },
         { title: "Análise de Clientes", url: "/customer-analytics", icon: BarChart3 },
         { title: "Análise de Produtos", url: "/product-analytics", icon: TrendingUp },
+        { title: "Análise de Funcionários", url: "/employee-analytics", icon: Users },
         { title: "Compras", url: "/purchases", icon: ShoppingCart },
       ]
     },

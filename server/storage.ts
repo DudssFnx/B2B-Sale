@@ -102,6 +102,9 @@ export interface IStorage {
   // Purchases Analytics (for purchasing/restocking decisions)
   getPurchasesAnalytics(): Promise<PurchasesAnalyticsData>;
 
+  // Employee Analytics
+  getEmployeeAnalytics(): Promise<EmployeeAnalyticsData>;
+
   // Stock Management
   reserveStockForOrder(orderId: number, userId: string): Promise<{ success: boolean; error?: string }>;
   releaseStockForOrder(orderId: number): Promise<{ success: boolean; error?: string }>;
@@ -370,6 +373,39 @@ export interface PurchasesAnalyticsData {
   slowMoving: SlowMovingProduct[];
   fastMoving: FastMovingProduct[];
   suggestions: PurchaseSuggestion[];
+}
+
+// Employee Analytics Types
+export interface EmployeeMetrics {
+  userId: string;
+  name: string;
+  email: string | null;
+  role: string;
+  totalOrders: number;
+  totalRevenue: number;
+  avgTicket: number;
+  ordersThisMonth: number;
+  revenueThisMonth: number;
+  ordersThisQuarter: number;
+  revenueThisQuarter: number;
+  lastActivity: Date | null;
+}
+
+export interface EmployeeAnalyticsData {
+  employees: EmployeeMetrics[];
+  overview: {
+    totalEmployees: number;
+    totalOrdersThisMonth: number;
+    totalRevenueThisMonth: number;
+    avgOrdersPerEmployee: number;
+    topPerformer: string | null;
+  };
+  periodComparison: {
+    thisMonth: { orders: number; revenue: number };
+    lastMonth: { orders: number; revenue: number };
+    thisQuarter: { orders: number; revenue: number };
+    lastQuarter: { orders: number; revenue: number };
+  };
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2046,6 +2082,110 @@ export class DatabaseStorage implements IStorage {
       slowMoving: slowMoving.slice(0, 50),
       fastMoving: fastMoving.slice(0, 50),
       suggestions: suggestions.slice(0, 30),
+    };
+  }
+
+  async getEmployeeAnalytics(): Promise<EmployeeAnalyticsData> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+    const startOfQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    const startOfLastQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 - 3, 1);
+    const endOfLastQuarter = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 0);
+
+    const allUsers = await db.select().from(users);
+    const employees = allUsers.filter(u => u.role === 'admin' || u.role === 'sales');
+    
+    const allOrders = await db.select().from(orders).where(eq(orders.status, 'FATURADO'));
+
+    const employeeMetrics: EmployeeMetrics[] = [];
+
+    for (const emp of employees) {
+      // Attribution: orders where employee is listed as invoicedBy OR reservedBy (they processed the order)
+      const empOrders = allOrders.filter(o => o.invoicedBy === emp.id || o.reservedBy === emp.id);
+      
+      // Use invoicedAt for period comparisons (when employee actually processed the order)
+      // Fall back to createdAt if invoicedAt is not available
+      const getOrderDate = (o: typeof allOrders[0]) => o.invoicedAt ? new Date(o.invoicedAt) : new Date(o.createdAt);
+      
+      const ordersThisMonth = empOrders.filter(o => getOrderDate(o) >= startOfMonth);
+      const ordersLastMonth = empOrders.filter(o => {
+        const orderDate = getOrderDate(o);
+        return orderDate >= startOfLastMonth && orderDate <= endOfLastMonth;
+      });
+      const ordersThisQuarter = empOrders.filter(o => getOrderDate(o) >= startOfQuarter);
+      const ordersLastQuarter = empOrders.filter(o => {
+        const orderDate = getOrderDate(o);
+        return orderDate >= startOfLastQuarter && orderDate <= endOfLastQuarter;
+      });
+
+      const totalRevenue = empOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const revenueThisMonth = ordersThisMonth.reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const revenueThisQuarter = ordersThisQuarter.reduce((sum, o) => sum + parseFloat(o.total), 0);
+      
+      // Sort by invoicedAt for last activity
+      const sortedOrders = [...empOrders].sort((a, b) => 
+        getOrderDate(b).getTime() - getOrderDate(a).getTime()
+      );
+
+      employeeMetrics.push({
+        userId: emp.id,
+        name: [emp.firstName, emp.lastName].filter(Boolean).join(' ') || emp.email || 'Funcionario',
+        email: emp.email,
+        role: emp.role,
+        totalOrders: empOrders.length,
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        avgTicket: empOrders.length > 0 ? Math.round((totalRevenue / empOrders.length) * 100) / 100 : 0,
+        ordersThisMonth: ordersThisMonth.length,
+        revenueThisMonth: Math.round(revenueThisMonth * 100) / 100,
+        ordersThisQuarter: ordersThisQuarter.length,
+        revenueThisQuarter: Math.round(revenueThisQuarter * 100) / 100,
+        lastActivity: sortedOrders.length > 0 ? getOrderDate(sortedOrders[0]) : null,
+      });
+    }
+
+    employeeMetrics.sort((a, b) => b.revenueThisMonth - a.revenueThisMonth);
+
+    // Use invoicedAt for period comparisons (fallback to createdAt)
+    const getOrderDateGlobal = (o: typeof allOrders[0]) => o.invoicedAt ? new Date(o.invoicedAt) : new Date(o.createdAt);
+    
+    const totalOrdersThisMonth = employeeMetrics.reduce((sum, e) => sum + e.ordersThisMonth, 0);
+    const totalRevenueThisMonth = employeeMetrics.reduce((sum, e) => sum + e.revenueThisMonth, 0);
+    const totalOrdersLastMonth = allOrders.filter(o => {
+      const orderDate = getOrderDateGlobal(o);
+      return orderDate >= startOfLastMonth && orderDate <= endOfLastMonth;
+    }).length;
+    const totalRevenueLastMonth = allOrders.filter(o => {
+      const orderDate = getOrderDateGlobal(o);
+      return orderDate >= startOfLastMonth && orderDate <= endOfLastMonth;
+    }).reduce((sum, o) => sum + parseFloat(o.total), 0);
+    const totalOrdersThisQuarter = employeeMetrics.reduce((sum, e) => sum + e.ordersThisQuarter, 0);
+    const totalRevenueThisQuarter = employeeMetrics.reduce((sum, e) => sum + e.revenueThisQuarter, 0);
+    const totalOrdersLastQuarter = allOrders.filter(o => {
+      const orderDate = getOrderDateGlobal(o);
+      return orderDate >= startOfLastQuarter && orderDate <= endOfLastQuarter;
+    }).length;
+    const totalRevenueLastQuarter = allOrders.filter(o => {
+      const orderDate = getOrderDateGlobal(o);
+      return orderDate >= startOfLastQuarter && orderDate <= endOfLastQuarter;
+    }).reduce((sum, o) => sum + parseFloat(o.total), 0);
+
+    return {
+      employees: employeeMetrics,
+      overview: {
+        totalEmployees: employees.length,
+        totalOrdersThisMonth,
+        totalRevenueThisMonth: Math.round(totalRevenueThisMonth * 100) / 100,
+        avgOrdersPerEmployee: employees.length > 0 ? Math.round((totalOrdersThisMonth / employees.length) * 10) / 10 : 0,
+        topPerformer: employeeMetrics.length > 0 ? employeeMetrics[0].name : null,
+      },
+      periodComparison: {
+        thisMonth: { orders: totalOrdersThisMonth, revenue: Math.round(totalRevenueThisMonth * 100) / 100 },
+        lastMonth: { orders: totalOrdersLastMonth, revenue: Math.round(totalRevenueLastMonth * 100) / 100 },
+        thisQuarter: { orders: totalOrdersThisQuarter, revenue: Math.round(totalRevenueThisQuarter * 100) / 100 },
+        lastQuarter: { orders: totalOrdersLastQuarter, revenue: Math.round(totalRevenueLastQuarter * 100) / 100 },
+      },
     };
   }
 }
