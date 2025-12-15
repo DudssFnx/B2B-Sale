@@ -194,6 +194,28 @@ export default function OrderDetailsPage() {
     },
   });
 
+  const unreserveMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", `/api/orders/${orderId}/unreserve`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/orders", orderId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({
+        title: "Sucesso",
+        description: "Pedido retornado para Orçamento. Estoque liberado.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: "Erro",
+        description: err.message || "Não foi possível retornar o pedido.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -372,11 +394,24 @@ export default function OrderDetailsPage() {
 
           {isPedidoGerado && (
             <Card className="border-orange-500/50 bg-orange-500/5">
-              <CardContent className="flex items-center gap-3 py-4">
-                <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                <p className="text-sm text-orange-700 dark:text-orange-300" data-testid="alert-gerado">
-                  Este pedido tem estoque reservado. Para editar, primeiro retorne o status para "Orçamento Enviado".
-                </p>
+              <CardContent className="flex items-center justify-between gap-3 py-4">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                  <p className="text-sm text-orange-700 dark:text-orange-300" data-testid="alert-gerado">
+                    Este pedido tem estoque reservado.
+                  </p>
+                </div>
+                {canEditStatus && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => unreserveMutation.mutate()}
+                    disabled={unreserveMutation.isPending}
+                    data-testid="button-unreserve"
+                  >
+                    {unreserveMutation.isPending ? "Retornando..." : "Retornar para Orçamento"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
