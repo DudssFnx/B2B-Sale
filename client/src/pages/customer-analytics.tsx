@@ -126,6 +126,33 @@ function RFMSegmentBadge({ segment }: { segment: string }) {
   return <Badge className={colors[segment] || 'bg-muted'}>{segment}</Badge>;
 }
 
+function getCustomerTags(customer: CustomerRanking, allCustomers: CustomerRanking[]): { label: string; className: string }[] {
+  const tags: { label: string; className: string }[] = [];
+  
+  const sortedByRevenue = [...allCustomers].sort((a, b) => b.totalRevenue - a.totalRevenue);
+  const top10PercentCount = Math.max(1, Math.ceil(allCustomers.length * 0.1));
+  const isTop10Percent = sortedByRevenue.slice(0, top10PercentCount).some(c => c.userId === customer.userId);
+  const isRecentBuyer = customer.daysSinceLastOrder <= 30;
+  
+  if (isTop10Percent && isRecentBuyer) {
+    tags.push({ label: 'Cliente VIP', className: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400' });
+  }
+  
+  if (customer.totalRevenue >= 5000) {
+    tags.push({ label: 'Cliente Atacado', className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400' });
+  }
+  
+  if (customer.orderCount >= 5) {
+    tags.push({ label: 'Compra Recorrente', className: 'bg-blue-500/10 text-blue-600 dark:text-blue-400' });
+  }
+  
+  if (customer.orderCount === 0 && customer.totalRevenue === 0) {
+    tags.push({ label: 'Só orçamento', className: 'bg-gray-500/10 text-gray-600 dark:text-gray-400' });
+  }
+  
+  return tags;
+}
+
 function RankingTable({ customers, showRank = true }: { customers: CustomerRanking[], showRank?: boolean }) {
   if (customers.length === 0) {
     return (
@@ -172,6 +199,15 @@ function RankingTable({ customers, showRank = true }: { customers: CustomerRanki
                   <p className="font-medium">{customer.name}</p>
                   {customer.company && (
                     <p className="text-xs text-muted-foreground">{customer.company}</p>
+                  )}
+                  {getCustomerTags(customer, customers).length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {getCustomerTags(customer, customers).map((tag, i) => (
+                        <Badge key={i} className={tag.className} variant="outline">
+                          {tag.label}
+                        </Badge>
+                      ))}
+                    </div>
                   )}
                 </div>
               </td>

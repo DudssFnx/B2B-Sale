@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,7 +68,6 @@ export default function ProductsPage() {
   const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const MAX_IMAGES = 5;
 
   const { data: productsResponse, isLoading } = useQuery<{ products: SchemaProduct[]; total: number }>({
@@ -448,63 +447,75 @@ export default function ProductsPage() {
                 <div className="col-span-2">
                   <FormLabel>Imagens do Produto ({imageUrls.length}/{MAX_IMAGES})</FormLabel>
                   <div className="mt-2 space-y-3">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-3 items-start">
                       {imageUrls.map((url, index) => (
-                        <div key={index} className="relative w-20 h-20 rounded-lg border overflow-hidden group">
+                        <div key={index} className="relative w-24 h-24 rounded-lg border-2 overflow-hidden bg-muted">
                           <img 
                             src={url} 
                             alt={`Imagem ${index + 1}`} 
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
-                              target.nextElementSibling?.classList.remove('hidden');
-                            }}
                           />
-                          <div className="hidden w-full h-full flex items-center justify-center bg-muted/50">
-                            <Image className="h-5 w-5 text-muted-foreground/50" />
-                          </div>
                           <Button
                             type="button"
                             variant="destructive"
                             size="icon"
-                            className="absolute top-1 right-1 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-1 right-1 h-6 w-6"
                             onClick={() => removeImage(index)}
                             data-testid={`button-remove-image-${index}`}
                           >
-                            <X className="h-3 w-3" />
+                            <X className="h-4 w-4" />
                           </Button>
                           {index === 0 && (
-                            <Badge className="absolute bottom-1 left-1 text-xs px-1 py-0">Principal</Badge>
+                            <Badge className="absolute bottom-1 left-1 text-xs">Principal</Badge>
                           )}
                         </div>
                       ))}
-                      {imageUrls.length < MAX_IMAGES && (
-                        <div 
-                          className="w-20 h-20 rounded-lg border-2 border-dashed border-muted-foreground/25 flex items-center justify-center bg-muted/30 cursor-pointer hover-elevate"
-                          onClick={() => fileInputRef.current?.click()}
-                        >
-                          {isUploading ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                          ) : (
-                            <Plus className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      )}
                     </div>
-                    <input
-                      type="file"
-                      accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.heic,.heif,.avif"
-                      className="hidden"
-                      ref={fileInputRef}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(file);
-                        e.target.value = '';
-                      }}
-                      data-testid="input-product-image"
-                    />
-                    <p className="text-xs text-muted-foreground">Aceita todos os formatos de imagem (JPG, PNG, WebP, GIF, BMP, HEIC, etc). Maximo 5MB por imagem.</p>
+                    
+                    {imageUrls.length < MAX_IMAGES && (
+                      <div className="flex items-center gap-3">
+                        <label className="cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,.jpg,.jpeg,.png,.webp,.gif,.bmp"
+                            className="sr-only"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                handleImageUpload(file);
+                              }
+                              e.target.value = '';
+                            }}
+                            data-testid="input-product-image"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploading}
+                            asChild
+                          >
+                            <span>
+                              {isUploading ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Enviando...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Escolher Imagem
+                                </>
+                              )}
+                            </span>
+                          </Button>
+                        </label>
+                        <span className="text-sm text-muted-foreground">
+                          {imageUrls.length}/{MAX_IMAGES} imagens
+                        </span>
+                      </div>
+                    )}
+                    
+                    <p className="text-xs text-muted-foreground">Formatos aceitos: JPG, PNG, WebP, GIF, BMP. Maximo 5MB por imagem.</p>
                   </div>
                 </div>
 

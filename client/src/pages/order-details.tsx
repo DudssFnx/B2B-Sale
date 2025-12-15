@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Loader2, Package, User, Calendar, FileText, DollarSign, Printer, MapPin, Download, Pencil, Plus, Minus, Trash2, Search, X, AlertTriangle, ChevronDown } from "lucide-react";
+import { ArrowLeft, Loader2, Package, User, Calendar, FileText, DollarSign, Printer, MapPin, Download, Pencil, Plus, Minus, Trash2, Search, X, AlertTriangle, ChevronDown, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import type { Order, OrderItem, Product as SchemaProduct } from "@shared/schema";
@@ -741,6 +741,43 @@ export default function OrderDetailsPage() {
                   >
                     <Download className="h-4 w-4 mr-2" />
                     PDF Conferencia
+                  </Button>
+                </div>
+                <Separator className="my-2" />
+                <div className="grid grid-cols-1 gap-2">
+                  {customer?.phone && (
+                    <Button
+                      variant="outline"
+                      className="w-full bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400"
+                      onClick={() => {
+                        const phone = customer.phone?.replace(/\D/g, '');
+                        const customerName = customer.firstName || 'Cliente';
+                        const message = encodeURIComponent(
+                          `Oi ${customerName}, tudo bem? Estou entrando em contato sobre o pedido ${orderData.orderNumber}.`
+                        );
+                        window.open(`https://wa.me/55${phone}?text=${message}`, '_blank');
+                      }}
+                      data-testid="button-whatsapp-customer"
+                    >
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Chamar Cliente no WhatsApp
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="w-full bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400"
+                    onClick={() => {
+                      const customerName = customer?.firstName || 'Cliente';
+                      const total = parseFloat(orderData.total).toFixed(2);
+                      const message = encodeURIComponent(
+                        `Oi ${customerName} acabei de mandar orçamento de número ${orderData.orderNumber} de valor R$ ${total} aguardando para darmos andamento`
+                      );
+                      window.open(`https://wa.me/5511992845596?text=${message}`, '_blank');
+                    }}
+                    data-testid="button-whatsapp-store"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Enviar Pedido no WhatsApp
                   </Button>
                 </div>
               </CardContent>
