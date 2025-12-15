@@ -5,6 +5,13 @@ import { X, Share, Plus, MoreVertical, Download } from "lucide-react";
 
 type DeviceType = "ios" | "android" | "desktop" | "unknown";
 
+const MAX_DISMISS_COUNT = 5;
+const STORAGE_KEYS = {
+  installed: "pwa-installed",
+  dismissCount: "pwa-dismiss-count",
+  lastDismissTime: "pwa-last-dismiss",
+};
+
 function detectDevice(): DeviceType {
   const ua = navigator.userAgent.toLowerCase();
   
@@ -27,19 +34,47 @@ function isStandalone(): boolean {
   );
 }
 
+function getDismissCount(): number {
+  const count = localStorage.getItem(STORAGE_KEYS.dismissCount);
+  return count ? parseInt(count, 10) : 0;
+}
+
+function isInstalled(): boolean {
+  return localStorage.getItem(STORAGE_KEYS.installed) === "true";
+}
+
+function shouldShowPrompt(): boolean {
+  if (isStandalone() || isInstalled()) {
+    return false;
+  }
+  
+  const dismissCount = getDismissCount();
+  if (dismissCount >= MAX_DISMISS_COUNT) {
+    return false;
+  }
+  
+  const lastDismiss = localStorage.getItem(STORAGE_KEYS.lastDismissTime);
+  if (lastDismiss) {
+    const hoursSinceLastDismiss = (Date.now() - parseInt(lastDismiss, 10)) / (1000 * 60 * 60);
+    if (hoursSinceLastDismiss < 24) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
 export function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [deviceType, setDeviceType] = useState<DeviceType>("unknown");
-  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    const alreadyDismissed = localStorage.getItem("pwa-prompt-dismissed");
-    if (alreadyDismissed) {
-      setDismissed(true);
+    if (isStandalone()) {
+      localStorage.setItem(STORAGE_KEYS.installed, "true");
       return;
     }
 
-    if (isStandalone()) {
+    if (!shouldShowPrompt()) {
       return;
     }
 
@@ -54,19 +89,28 @@ export function PWAInstallPrompt() {
     }
   }, []);
 
+  const handleInstalled = () => {
+    setShowPrompt(false);
+    localStorage.setItem(STORAGE_KEYS.installed, "true");
+  };
+
   const handleDismiss = () => {
     setShowPrompt(false);
-    setDismissed(true);
-    localStorage.setItem("pwa-prompt-dismissed", "true");
+    const currentCount = getDismissCount();
+    localStorage.setItem(STORAGE_KEYS.dismissCount, String(currentCount + 1));
+    localStorage.setItem(STORAGE_KEYS.lastDismissTime, String(Date.now()));
   };
 
   const handleLater = () => {
-    setShowPrompt(false);
+    handleDismiss();
   };
 
-  if (!showPrompt || dismissed) {
+  if (!showPrompt) {
     return null;
   }
+
+  const dismissCount = getDismissCount();
+  const remainingShows = MAX_DISMISS_COUNT - dismissCount;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 bg-black/50" onClick={handleLater}>
@@ -159,10 +203,16 @@ export function PWAInstallPrompt() {
             <Button variant="outline" className="flex-1" onClick={handleLater} data-testid="button-later-pwa">
               Agora não
             </Button>
-            <Button className="flex-1" onClick={handleDismiss} data-testid="button-ok-pwa">
-              Entendi
+            <Button className="flex-1" onClick={handleInstalled} data-testid="button-ok-pwa">
+              Já instalei
             </Button>
           </div>
+          
+          {remainingShows <= 3 && remainingShows > 0 && (
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Este aviso aparecerá mais {remainingShows} vez{remainingShows > 1 ? "es" : ""}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

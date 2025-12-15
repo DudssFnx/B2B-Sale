@@ -260,6 +260,20 @@ export default function OrdersPage() {
     },
   });
 
+  const unreserveMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      await apiRequest("POST", `/api/orders/${orderId}/unreserve`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      toast({ title: "Sucesso", description: "Pedido retornado para Orçamento - Estoque liberado" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Erro", description: err.message || "Falha ao retornar pedido", variant: "destructive" });
+    },
+  });
+
   const updateStageMutation = useMutation({
     mutationFn: async ({ orderId, stage }: { orderId: string; stage: string }) => {
       await apiRequest("PATCH", `/api/orders/${orderId}/stage`, { stage });
@@ -283,6 +297,10 @@ export default function OrdersPage() {
 
   const handleInvoice = (order: Order) => {
     invoiceMutation.mutate(order.id);
+  };
+
+  const handleUnreserve = (order: Order) => {
+    unreserveMutation.mutate(order.id);
   };
 
   const handleUpdateStage = (order: Order, stage: string) => {

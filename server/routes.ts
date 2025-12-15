@@ -811,6 +811,37 @@ export async function registerRoutes(
     }
   });
 
+  app.post('/api/orders/:id/unreserve', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const orderId = parseInt(req.params.id);
+      const order = await storage.getOrder(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Pedido não encontrado" });
+      }
+      
+      if (order.status !== 'PEDIDO_GERADO') {
+        return res.status(400).json({ message: "Apenas pedidos com status 'Pedido Gerado' podem retornar para Orçamento" });
+      }
+      
+      const releaseResult = await storage.releaseStockForOrder(orderId);
+      if (!releaseResult.success) {
+        return res.status(400).json({ message: releaseResult.error });
+      }
+      
+      const updatedOrder = await storage.updateOrder(orderId, { 
+        status: 'ORCAMENTO',
+        reservedAt: null,
+        reservedBy: null,
+      });
+      
+      res.json(updatedOrder);
+    } catch (error) {
+      console.error("Error unreserving order:", error);
+      res.status(500).json({ message: "Erro ao retornar pedido para orçamento" });
+    }
+  });
+
   app.put('/api/orders/:id/items', isAuthenticated, isAdminOrSales, async (req: any, res) => {
     try {
       const orderId = parseInt(req.params.id);
