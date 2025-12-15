@@ -139,7 +139,7 @@ export default function PurchasesDashboardPage() {
         />
         <StatCard
           title="Custo Est. Compra"
-          value={`R$ ${data.overview.estimatedPurchaseValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
+          value={`R$ ${(data.overview.estimatedPurchaseValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
           icon={DollarSign}
           data-testid="stat-estimated-cost"
         />
