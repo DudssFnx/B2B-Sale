@@ -305,7 +305,7 @@ export default function PurchasesDashboardPage() {
                         </div>
                         <div>
                           <p className="text-muted-foreground">Valor Est.</p>
-                          <p className="font-semibold">R$ {item.stockValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <p className="font-semibold">R$ {(item.stockValue ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Dias s/ Venda</p>
