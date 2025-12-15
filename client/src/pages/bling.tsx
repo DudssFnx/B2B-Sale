@@ -7,7 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, CheckCircle, XCircle, RefreshCw, Link as LinkIcon, FolderSync, Package, Unlink, Clock, AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Loader2, CheckCircle, XCircle, RefreshCw, Link as LinkIcon, FolderSync, Package, Unlink, Clock, AlertCircle, Download, Search } from "lucide-react";
 
 interface BlingStatus {
   authenticated: boolean;
@@ -33,11 +36,38 @@ interface SyncProgress {
   estimatedRemaining: string | null;
 }
 
+interface BlingCategory {
+  id: number;
+  descricao: string;
+  categoriaPai?: { id: number };
+}
+
+interface BlingProduct {
+  id: number;
+  nome: string;
+  codigo: string;
+  preco: number;
+  situacao: string;
+}
+
+interface ImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
 export default function BlingPage() {
   const { toast } = useToast();
   const [location] = useLocation();
   const [syncProgress, setSyncProgress] = useState<SyncProgress | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const [activeTab, setActiveTab] = useState("categories");
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
+  const [blingCategories, setBlingCategories] = useState<BlingCategory[]>([]);
+  const [blingProducts, setBlingProducts] = useState<BlingProduct[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   const { data: status, isLoading } = useQuery<BlingStatus>({
     queryKey: ["/api/bling/status"],
@@ -152,6 +182,116 @@ export default function BlingPage() {
 
   const handleConnect = () => {
     window.location.href = "/api/bling/auth";
+  };
+
+  const loadBlingCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const response = await apiRequest("GET", "/api/bling/categories/preview");
+      const data = await response.json();
+      setBlingCategories(data.categories || []);
+      setSelectedCategories([]);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar categorias",
+        description: error.message || "Falha ao buscar categorias do Bling",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const loadBlingProducts = async () => {
+    setLoadingProducts(true);
+    try {
+      const response = await apiRequest("GET", "/api/bling/products/preview");
+      const data = await response.json();
+      setBlingProducts(data.products || []);
+      setSelectedProducts([]);
+    } catch (error: any) {
+      toast({
+        title: "Erro ao carregar produtos",
+        description: error.message || "Falha ao buscar produtos do Bling",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProducts(false);
+    }
+  };
+
+  const importCategoriesMutation = useMutation({
+    mutationFn: async (categoryIds: number[]) => {
+      const response = await apiRequest("POST", "/api/bling/categories/import", { categoryIds });
+      return response.json();
+    },
+    onSuccess: (data: ImportResult) => {
+      toast({
+        title: "Categorias importadas",
+        description: `${data.imported} importadas, ${data.skipped} já existentes`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/categories"] });
+      setSelectedCategories([]);
+      loadBlingCategories();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao importar categorias",
+        description: error.message || "Falha ao importar categorias selecionadas",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const importProductsMutation = useMutation({
+    mutationFn: async (productIds: number[]) => {
+      const response = await apiRequest("POST", "/api/bling/products/import", { productIds });
+      return response.json();
+    },
+    onSuccess: (data: ImportResult) => {
+      toast({
+        title: "Produtos importados",
+        description: `${data.imported} importados, ${data.skipped} já existentes`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      setSelectedProducts([]);
+      loadBlingProducts();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao importar produtos",
+        description: error.message || "Falha ao importar produtos selecionados",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const toggleCategorySelection = (id: number) => {
+    setSelectedCategories(prev => 
+      prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
+    );
+  };
+
+  const toggleProductSelection = (id: number) => {
+    setSelectedProducts(prev => 
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllCategories = () => {
+    if (selectedCategories.length === blingCategories.length) {
+      setSelectedCategories([]);
+    } else {
+      setSelectedCategories(blingCategories.map(c => c.id));
+    }
+  };
+
+  const selectAllProducts = () => {
+    if (selectedProducts.length === blingProducts.length) {
+      setSelectedProducts([]);
+    } else {
+      setSelectedProducts(blingProducts.map(p => p.id));
+    }
   };
 
   const isSyncing = syncProgress?.status === 'running';
@@ -358,6 +498,191 @@ export default function BlingPage() {
             <p className="text-sm text-muted-foreground">
               A sincronização irá importar ou atualizar categorias e produtos da sua conta Bling.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {status?.authenticated && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="h-5 w-5" />
+              Importação Manual
+            </CardTitle>
+            <CardDescription>
+              Selecione categorias e produtos específicos para importar do Bling
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="categories" data-testid="tab-categories">
+                  <FolderSync className="h-4 w-4 mr-2" />
+                  Categorias
+                </TabsTrigger>
+                <TabsTrigger value="products" data-testid="tab-products">
+                  <Package className="h-4 w-4 mr-2" />
+                  Produtos
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="categories" className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={loadBlingCategories}
+                    disabled={loadingCategories}
+                    data-testid="button-load-categories"
+                  >
+                    {loadingCategories ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-2" />
+                    )}
+                    Carregar Categorias
+                  </Button>
+                  {blingCategories.length > 0 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectAllCategories}
+                        data-testid="button-select-all-categories"
+                      >
+                        {selectedCategories.length === blingCategories.length ? "Desmarcar Tudo" : "Selecionar Tudo"}
+                      </Button>
+                      <Badge variant="secondary">
+                        {selectedCategories.length} de {blingCategories.length} selecionadas
+                      </Badge>
+                    </>
+                  )}
+                </div>
+
+                {blingCategories.length > 0 && (
+                  <ScrollArea className="h-64 border rounded-md p-3">
+                    <div className="space-y-2">
+                      {blingCategories.map((category) => (
+                        <label
+                          key={category.id}
+                          className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                          data-testid={`category-item-${category.id}`}
+                        >
+                          <Checkbox
+                            checked={selectedCategories.includes(category.id)}
+                            onCheckedChange={() => toggleCategorySelection(category.id)}
+                            data-testid={`checkbox-category-${category.id}`}
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium">{category.descricao}</span>
+                            {category.categoriaPai && (
+                              <span className="text-xs text-muted-foreground ml-2">
+                                (Subcategoria)
+                              </span>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            ID: {category.id}
+                          </Badge>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+
+                {blingCategories.length > 0 && (
+                  <Button
+                    onClick={() => importCategoriesMutation.mutate(selectedCategories)}
+                    disabled={selectedCategories.length === 0 || importCategoriesMutation.isPending}
+                    data-testid="button-import-categories"
+                  >
+                    {importCategoriesMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Importar {selectedCategories.length} Categoria{selectedCategories.length !== 1 ? 's' : ''}
+                  </Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="products" className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={loadBlingProducts}
+                    disabled={loadingProducts}
+                    data-testid="button-load-products"
+                  >
+                    {loadingProducts ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-2" />
+                    )}
+                    Carregar Produtos
+                  </Button>
+                  {blingProducts.length > 0 && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectAllProducts}
+                        data-testid="button-select-all-products"
+                      >
+                        {selectedProducts.length === blingProducts.length ? "Desmarcar Tudo" : "Selecionar Tudo"}
+                      </Button>
+                      <Badge variant="secondary">
+                        {selectedProducts.length} de {blingProducts.length} selecionados
+                      </Badge>
+                    </>
+                  )}
+                </div>
+
+                {blingProducts.length > 0 && (
+                  <ScrollArea className="h-64 border rounded-md p-3">
+                    <div className="space-y-2">
+                      {blingProducts.map((product) => (
+                        <label
+                          key={product.id}
+                          className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                          data-testid={`product-item-${product.id}`}
+                        >
+                          <Checkbox
+                            checked={selectedProducts.includes(product.id)}
+                            onCheckedChange={() => toggleProductSelection(product.id)}
+                            data-testid={`checkbox-product-${product.id}`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{product.nome}</div>
+                            <div className="text-xs text-muted-foreground flex flex-wrap gap-2">
+                              <span>SKU: {product.codigo}</span>
+                              <span>R$ {product.preco?.toFixed(2) || '0.00'}</span>
+                            </div>
+                          </div>
+                          <Badge variant={product.situacao === 'A' ? 'default' : 'secondary'} className="text-xs">
+                            {product.situacao === 'A' ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+
+                {blingProducts.length > 0 && (
+                  <Button
+                    onClick={() => importProductsMutation.mutate(selectedProducts)}
+                    disabled={selectedProducts.length === 0 || importProductsMutation.isPending}
+                    data-testid="button-import-products"
+                  >
+                    {importProductsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Importar {selectedProducts.length} Produto{selectedProducts.length !== 1 ? 's' : ''}
+                  </Button>
+                )}
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       )}

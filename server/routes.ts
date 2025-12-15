@@ -1355,6 +1355,233 @@ export async function registerRoutes(
     }
   });
 
+  // ========== BLING MANUAL IMPORT ==========
+  
+  // Preview Bling categories (without importing)
+  app.get("/api/bling/categories/preview", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const categories = await blingService.fetchBlingCategories();
+      res.json(categories);
+    } catch (error: any) {
+      console.error("Bling fetch categories error:", error);
+      res.status(500).json({ error: "Falha ao buscar categorias do Bling" });
+    }
+  });
+
+  // Import selected Bling categories
+  app.post("/api/bling/categories/import", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { categoryIds } = req.body;
+      if (!categoryIds || !Array.isArray(categoryIds) || categoryIds.length === 0) {
+        return res.status(400).json({ error: "categoryIds é obrigatório" });
+      }
+      
+      const allCategories = await blingService.fetchBlingCategories();
+      const selectedCategories = allCategories.filter(c => categoryIds.includes(c.id));
+      
+      let created = 0;
+      let updated = 0;
+      
+      // Build map for parent resolution
+      const blingCatMap = new Map<number, typeof allCategories[0]>();
+      allCategories.forEach(c => blingCatMap.set(c.id, c));
+      const blingIdToLocalId: Record<number, number> = {};
+      
+      // Load existing categories
+      const existingCategories = await storage.getCategories();
+      existingCategories.forEach(c => {
+        if (c.blingId) {
+          blingIdToLocalId[c.blingId] = c.id;
+        }
+      });
+      
+      // Topological sort to process parents first
+      function topologicalSort(cats: typeof selectedCategories): typeof selectedCategories {
+        const sorted: typeof selectedCategories = [];
+        const visited = new Set<number>();
+        
+        function visit(cat: typeof cats[0]) {
+          if (visited.has(cat.id)) return;
+          visited.add(cat.id);
+          
+          const parentBlingId = cat.categoriaPai?.id;
+          if (parentBlingId && blingCatMap.has(parentBlingId)) {
+            const parent = blingCatMap.get(parentBlingId)!;
+            if (categoryIds.includes(parent.id)) {
+              visit(parent);
+            }
+          }
+          
+          sorted.push(cat);
+        }
+        
+        cats.forEach(c => visit(c));
+        return sorted;
+      }
+      
+      const sortedCategories = topologicalSort(selectedCategories);
+      
+      for (const cat of sortedCategories) {
+        const slug = cat.descricao
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/(^-|-$)/g, "") || `cat-${cat.id}`;
+        
+        const parentBlingId = cat.categoriaPai?.id;
+        const parentLocalId = parentBlingId ? blingIdToLocalId[parentBlingId] || null : null;
+        
+        const existing = await storage.getCategoryByBlingId(cat.id);
+        
+        if (!existing) {
+          const newCat = await storage.createCategory({
+            name: cat.descricao,
+            slug,
+            parentId: parentLocalId,
+            blingId: cat.id,
+          });
+          blingIdToLocalId[cat.id] = newCat.id;
+          created++;
+        } else {
+          await storage.updateCategory(existing.id, {
+            name: cat.descricao,
+            slug,
+            parentId: parentLocalId,
+            blingId: cat.id,
+          });
+          blingIdToLocalId[cat.id] = existing.id;
+          updated++;
+        }
+      }
+      
+      res.json({ created, updated });
+    } catch (error: any) {
+      console.error("Bling import categories error:", error);
+      res.status(500).json({ error: "Falha ao importar categorias" });
+    }
+  });
+
+  // Preview products from Bling (optionally filtered by category)
+  app.get("/api/bling/products/preview", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allProducts: any[] = [];
+      let page = 1;
+      const limit = 100;
+      
+      // Fetch all product pages
+      while (true) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        const pageProducts = await blingService.fetchBlingProductsList(page, limit);
+        if (pageProducts.length === 0) break;
+        
+        // Only include active products
+        for (const p of pageProducts) {
+          if (p.situacao === "A") {
+            allProducts.push(p);
+          }
+        }
+        
+        if (pageProducts.length < limit) break;
+        page++;
+      }
+      
+      res.json(allProducts);
+    } catch (error: any) {
+      console.error("Bling fetch products error:", error);
+      res.status(500).json({ error: "Falha ao buscar produtos do Bling" });
+    }
+  });
+
+  // Import selected Bling products
+  app.post("/api/bling/products/import", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { productIds } = req.body;
+      if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+        return res.status(400).json({ error: "productIds é obrigatório" });
+      }
+      
+      // Load category mappings
+      const existingCategories = await storage.getCategories();
+      const blingIdToCategoryId: Record<number, number> = {};
+      const categoryMap: Record<string, number> = {};
+      existingCategories.forEach(c => {
+        categoryMap[c.name.toLowerCase()] = c.id;
+        if (c.blingId) {
+          blingIdToCategoryId[c.blingId] = c.id;
+        }
+      });
+      
+      let created = 0;
+      let updated = 0;
+      const errors: string[] = [];
+      
+      for (const productId of productIds) {
+        await new Promise(resolve => setTimeout(resolve, 600));
+        
+        try {
+          const blingProduct = await blingService.fetchBlingProductDetails(productId);
+          if (!blingProduct) {
+            errors.push(`Produto ${productId}: Falha ao buscar detalhes`);
+            continue;
+          }
+          
+          let categoryId: number | null = null;
+          const blingCat = blingProduct.categoria;
+          if (blingCat && blingCat.id) {
+            categoryId = blingIdToCategoryId[blingCat.id] || null;
+            if (!categoryId && blingCat.descricao) {
+              categoryId = categoryMap[blingCat.descricao.toLowerCase()] || null;
+            }
+          }
+          
+          let imageUrl: string | null = null;
+          if (blingProduct.imagens && blingProduct.imagens.length > 0) {
+            const sortedImages = [...blingProduct.imagens].sort((a: any, b: any) => (a.ordem || 0) - (b.ordem || 0));
+            imageUrl = sortedImages[0]?.linkExterno || sortedImages[0]?.link || null;
+          }
+          if (!imageUrl && blingProduct.midia?.imagens?.externas?.[0]?.link) {
+            imageUrl = blingProduct.midia.imagens.externas[0].link;
+          }
+          if (!imageUrl && blingProduct.midia?.imagens?.internas?.[0]?.link) {
+            imageUrl = blingProduct.midia.imagens.internas[0].link;
+          }
+          
+          const description = blingProduct.descricaoComplementar || blingProduct.descricaoCurta || null;
+          const stock = blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
+          
+          const productData = {
+            name: blingProduct.nome,
+            sku: blingProduct.codigo || `BLING-${blingProduct.id}`,
+            categoryId,
+            brand: blingProduct.marca || null,
+            description,
+            price: String(blingProduct.preco || 0),
+            stock,
+            image: imageUrl,
+          };
+          
+          const existing = await storage.getProductBySku(productData.sku);
+          
+          if (!existing) {
+            await storage.createProduct(productData);
+            created++;
+          } else {
+            await storage.updateProduct(existing.id, productData);
+            updated++;
+          }
+        } catch (err: any) {
+          errors.push(`Produto ${productId}: ${err.message}`);
+        }
+      }
+      
+      res.json({ created, updated, errors });
+    } catch (error: any) {
+      console.error("Bling import products error:", error);
+      res.status(500).json({ error: "Falha ao importar produtos" });
+    }
+  });
+
   // ========== PDF GENERATION ==========
   
   // Helper function to draw standard PDF header

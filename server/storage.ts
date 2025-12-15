@@ -24,6 +24,7 @@ export interface IStorage {
   // Categories
   getCategories(): Promise<Category[]>;
   getCategory(id: number): Promise<Category | undefined>;
+  getCategoryByBlingId(blingId: number): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: number): Promise<boolean>;
@@ -31,6 +32,7 @@ export interface IStorage {
   // Products
   getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
   getProduct(id: number): Promise<Product | undefined>;
+  getProductBySku(sku: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<boolean>;
@@ -339,6 +341,11 @@ export class DatabaseStorage implements IStorage {
     return category;
   }
 
+  async getCategoryByBlingId(blingId: number): Promise<Category | undefined> {
+    const [category] = await db.select().from(categories).where(eq(categories.blingId, blingId));
+    return category;
+  }
+
   async createCategory(insertCategory: InsertCategory): Promise<Category> {
     const [category] = await db.insert(categories).values(insertCategory).returning();
     return category;
@@ -396,6 +403,11 @@ export class DatabaseStorage implements IStorage {
 
   async getProduct(id: number): Promise<Product | undefined> {
     const [product] = await db.select().from(products).where(eq(products.id, id));
+    return product;
+  }
+
+  async getProductBySku(sku: string): Promise<Product | undefined> {
+    const [product] = await db.select().from(products).where(eq(products.sku, sku));
     return product;
   }
 
