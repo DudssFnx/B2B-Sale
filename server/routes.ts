@@ -448,13 +448,13 @@ export async function registerRoutes(
       // Fetch customer info and item count for each order
       const ordersWithCustomers = await Promise.all(
         ordersData.map(async (order) => {
-          const customer = await storage.getUser(order.userId);
+          const customer = order.userId ? await storage.getUser(order.userId) : null;
           const orderItems = await storage.getOrderItems(order.id);
           return {
             ...order,
             customerName: customer ? 
               (customer.tradingName || customer.company || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email) 
-              : order.userId.substring(0, 8) + "...",
+              : (order.userId?.substring(0, 8) || 'Guest') + "...",
             items: orderItems,
           };
         })
@@ -1431,7 +1431,7 @@ export async function registerRoutes(
       });
       
       // Topological sort to process parents first
-      function topologicalSort(cats: typeof selectedCategories): typeof selectedCategories {
+      const topologicalSort = (cats: typeof selectedCategories): typeof selectedCategories => {
         const sorted: typeof selectedCategories = [];
         const visited = new Set<number>();
         
@@ -1733,9 +1733,9 @@ export async function registerRoutes(
             doc.rect(colCheck, rowY, 12, 12).stroke();
             
             // Foto do produto
-            if (item.product?.imageUrl) {
+            if (item.product?.image) {
               try {
-                const imgBuffer = await fetchImageBuffer(item.product.imageUrl);
+                const imgBuffer = await fetchImageBuffer(item.product.image);
                 if (imgBuffer) {
                   doc.image(imgBuffer, colImg, rowY, { width: 22, height: imgHeight, fit: [22, imgHeight] });
                 }
@@ -1890,7 +1890,7 @@ export async function registerRoutes(
           doc.rect(boxX, boxY, boxWidth, boxHeight).stroke();
           
           doc.text(`Subtotal:`, boxX + 10, boxY + 8);
-          doc.text(`R$ ${parseFloat(order.subtotal).toFixed(2)}`, boxX + 120, boxY + 8);
+          doc.text(`R$ ${parseFloat(order.subtotal || '0').toFixed(2)}`, boxX + 120, boxY + 8);
           
           doc.text(`Frete:`, boxX + 10, boxY + 23);
           doc.text(`R$ ${parseFloat(order.shippingCost || '0').toFixed(2)}`, boxX + 120, boxY + 23);
@@ -1970,9 +1970,9 @@ export async function registerRoutes(
             const rowY = doc.y;
 
             // Foto do produto
-            if (item.product?.imageUrl) {
+            if (item.product?.image) {
               try {
-                const imgBuffer = await fetchImageBuffer(item.product.imageUrl);
+                const imgBuffer = await fetchImageBuffer(item.product.image);
                 if (imgBuffer) {
                   doc.image(imgBuffer, colImg, rowY, { width: 22, height: imgHeight, fit: [22, imgHeight] });
                 }
