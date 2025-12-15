@@ -1125,6 +1125,55 @@ export async function registerRoutes(
     }
   });
 
+  // ========== FILE SERVING (public endpoint to serve object storage files) ==========
+  app.get('/api/files/*', async (req, res) => {
+    try {
+      const filePath = req.params[0];
+      console.log('[FILE SERVE] Requested:', filePath);
+      if (!filePath) {
+        return res.status(400).json({ message: "File path required" });
+      }
+
+      const objectStorage = await getObjectStorage();
+      const result = await objectStorage.downloadAsBytes(filePath);
+      console.log('[FILE SERVE] Result ok:', result?.ok, 'valueLength:', result?.value?.length);
+      
+      if (!result || !result.ok) {
+        console.log('[FILE SERVE] File not found or error:', filePath);
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      const ext = filePath.split('.').pop()?.toLowerCase() || '';
+      const mimeTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'webp': 'image/webp',
+        'gif': 'image/gif',
+        'bmp': 'image/bmp',
+        'tiff': 'image/tiff',
+        'tif': 'image/tiff',
+        'heic': 'image/heic',
+        'heif': 'image/heif',
+        'avif': 'image/avif',
+        'svg': 'image/svg+xml',
+      };
+      
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+      const buffer = Buffer.from(result.value);
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Content-Length', buffer.length);
+      res.setHeader('Cache-Control', 'public, max-age=31536000');
+      res.end(buffer);
+    } catch (error: any) {
+      console.error("Error serving file:", error);
+      if (error.message?.includes('not found') || error.message?.includes('NotFound')) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      res.status(500).json({ message: "Failed to serve file" });
+    }
+  });
+
   // ========== FILE UPLOAD ==========
   app.post('/api/upload', isAuthenticated, isAdminOrSales, upload.single('file'), async (req: any, res) => {
     try {
@@ -1133,7 +1182,6 @@ export async function registerRoutes(
       }
 
       const file = req.file;
-      // Expanded list of allowed image MIME types (including variants from different devices/browsers)
       const allowedTypes = [
         'image/jpeg', 
         'image/jpg',
@@ -1146,11 +1194,9 @@ export async function registerRoutes(
         'image/heif',
         'image/avif',
         'image/svg+xml',
-        // Some browsers/devices report these variants
-        'application/octet-stream', // Allow generic binary (we'll check extension)
+        'application/octet-stream',
       ];
       
-      // Check extension for fallback validation
       const fileExt = (file.originalname.split('.').pop() || '').toLowerCase();
       const allowedExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'tiff', 'tif', 'heic', 'heif', 'avif', 'svg'];
       
@@ -1169,8 +1215,7 @@ export async function registerRoutes(
       const objectStorage = await getObjectStorage();
       await objectStorage.uploadFromBytes(filename, file.buffer);
 
-      const bucketId = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
-      const publicUrl = `https://objectstorage.replit.app/${bucketId}/${filename}`;
+      const publicUrl = `/api/files/${filename}`;
       
       res.json({ 
         url: publicUrl,
