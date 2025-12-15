@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ShoppingCart, Package, ClipboardList, Users, ArrowRight, Loader2, TrendingUp, DollarSign, Calendar, BarChart3, PieChart as PieChartIcon, Crown, Award, AlertTriangle } from "lucide-react";
+import { ShoppingCart, Package, ClipboardList, Users, ArrowRight, Loader2, TrendingUp, DollarSign, Calendar, BarChart3, PieChart as PieChartIcon, Crown, Award, AlertTriangle, RefreshCw } from "lucide-react";
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import type { Order as SchemaOrder, Product, User } from "@shared/schema";
@@ -68,6 +68,17 @@ interface InactiveCustomer {
   orderCount: number;
 }
 
+interface ConversionMetric {
+  userId: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  totalQuotes: number;
+  convertedOrders: number;
+  conversionRate: number;
+  totalRevenue: number;
+}
+
 interface CustomerAnalyticsData {
   topCustomersByRevenue: {
     month: CustomerRanking[];
@@ -83,6 +94,7 @@ interface CustomerAnalyticsData {
     days90: InactiveCustomer[];
   };
   newCustomersThisMonth: CustomerRanking[];
+  conversionMetrics: ConversionMetric[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -606,6 +618,49 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <RefreshCw className="h-5 w-5 text-green-500" />
+                Ranking de Conversao (Orcamento para Faturado)
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">Clientes com melhor taxa de conversao de orcamentos</p>
+            </CardHeader>
+            <CardContent>
+              {customerAnalyticsLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : !customerAnalytics?.conversionMetrics?.length ? (
+                <p className="text-muted-foreground text-sm py-4">Nenhum dado de conversao disponivel</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {customerAnalytics.conversionMetrics.slice(0, 9).map((customer, idx) => (
+                    <div key={customer.userId} className="flex flex-col gap-2 p-3 rounded-md bg-muted/50" data-testid={`conversion-customer-${customer.userId}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold w-6 ${idx < 3 ? 'text-green-500' : 'text-muted-foreground'}`}>{idx + 1}.</span>
+                          <span className="text-sm font-medium truncate max-w-[120px]">{customer.company || customer.name}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          customer.conversionRate >= 80 ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                          customer.conversionRate >= 50 ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                          'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                        }`}>
+                          {customer.conversionRate.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{customer.convertedOrders} faturados / {customer.totalQuotes + customer.convertedOrders} total</span>
+                        <span>R$ {customer.totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader className="pb-3">

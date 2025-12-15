@@ -146,6 +146,17 @@ export interface InactiveCustomer {
   orderCount: number;
 }
 
+export interface ConversionMetric {
+  userId: string;
+  name: string;
+  company: string | null;
+  email: string | null;
+  totalQuotes: number;
+  convertedOrders: number;
+  conversionRate: number;
+  totalRevenue: number;
+}
+
 export interface CustomerAnalyticsData {
   topCustomersByRevenue: {
     month: CustomerRanking[];
@@ -174,6 +185,7 @@ export interface CustomerAnalyticsData {
     days60: number;
     days90: number;
   };
+  conversionMetrics: ConversionMetric[];
 }
 
 // Product Analytics Types
@@ -1178,6 +1190,50 @@ export class DatabaseStorage implements IStorage {
       cohortRetention.days90 = Math.round((cohortRetention.days90 / totalWithOrders) * 100);
     }
 
+    // Calculate conversion metrics (ORCAMENTO -> FATURADO)
+    const allOrdersIncludingQuotes = await db.select().from(orders);
+    const customerAllOrdersMap = new Map<string, Order[]>();
+    for (const order of allOrdersIncludingQuotes) {
+      const existing = customerAllOrdersMap.get(order.userId) || [];
+      existing.push(order);
+      customerAllOrdersMap.set(order.userId, existing);
+    }
+
+    const conversionMetrics: ConversionMetric[] = [];
+    for (const user of allCustomers) {
+      const customerOrders = customerAllOrdersMap.get(user.id) || [];
+      if (customerOrders.length === 0) continue;
+      
+      const quotes = customerOrders.filter(o => o.status === 'ORCAMENTO' || o.status === 'ORCAMENTO_ABERTO' || o.status === 'ORCAMENTO_CONCLUIDO');
+      const converted = customerOrders.filter(o => o.status === 'FATURADO' || o.status === 'PEDIDO_FATURADO');
+      const totalRevenue = converted.reduce((sum, o) => sum + parseFloat(o.total), 0);
+      
+      // Only include customers who have activity (either quotes or converted orders)
+      const totalActivity = quotes.length + converted.length;
+      if (totalActivity === 0) continue;
+      
+      // Conversion rate: If customer has only faturado orders (no quotes), they converted 100%
+      // If they have quotes, rate = converted / (quotes + converted) * 100
+      const conversionRate = totalActivity > 0 ? (converted.length / totalActivity) * 100 : 0;
+      
+      conversionMetrics.push({
+        userId: user.id,
+        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || user.email || 'Cliente',
+        company: user.company,
+        email: user.email,
+        totalQuotes: quotes.length,
+        convertedOrders: converted.length,
+        conversionRate,
+        totalRevenue,
+      });
+    }
+    
+    // Sort by conversion rate (descending), then by converted orders count
+    conversionMetrics.sort((a, b) => {
+      if (b.conversionRate !== a.conversionRate) return b.conversionRate - a.conversionRate;
+      return b.convertedOrders - a.convertedOrders;
+    });
+
     return {
       topCustomersByRevenue,
       topCustomersByFrequency,
@@ -1188,6 +1244,7 @@ export class DatabaseStorage implements IStorage {
       rfmSegments,
       avgDaysBetweenOrders,
       cohortRetention,
+      conversionMetrics,
     };
   }
 
