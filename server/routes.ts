@@ -1258,6 +1258,26 @@ export async function registerRoutes(
     }
   });
 
+  // ========== SITE SETTINGS ==========
+  app.get('/api/settings/:key', async (req, res) => {
+    try {
+      const setting = await storage.getSiteSetting(req.params.key);
+      res.json({ key: req.params.key, value: setting?.value || null });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+
+  app.post('/api/settings/:key', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { value } = req.body;
+      const setting = await storage.setSiteSetting(req.params.key, value);
+      res.json(setting);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to save setting" });
+    }
+  });
+
   // ========== CSV Export ==========
   app.get('/api/orders/export/csv', isAuthenticated, isAdminOrSales, async (req: any, res) => {
     try {

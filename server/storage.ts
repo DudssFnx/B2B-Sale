@@ -8,7 +8,8 @@ import {
   type CustomerPrice, type InsertCustomerPrice,
   type Coupon, type InsertCoupon,
   type AgendaEvent, type InsertAgendaEvent,
-  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents
+  type SiteSetting,
+  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
@@ -120,6 +121,10 @@ export interface IStorage {
   createAgendaEvent(event: InsertAgendaEvent): Promise<AgendaEvent>;
   updateAgendaEvent(id: number, event: Partial<InsertAgendaEvent>): Promise<AgendaEvent | undefined>;
   deleteAgendaEvent(id: number): Promise<boolean>;
+
+  // Site Settings
+  getSiteSetting(key: string): Promise<SiteSetting | undefined>;
+  setSiteSetting(key: string, value: string): Promise<SiteSetting>;
 }
 
 // Customer Analytics Types
@@ -2259,6 +2264,28 @@ export class DatabaseStorage implements IStorage {
   async deleteAgendaEvent(id: number): Promise<boolean> {
     const result = await db.delete(agendaEvents).where(eq(agendaEvents.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ========== SITE SETTINGS ==========
+  async getSiteSetting(key: string): Promise<SiteSetting | undefined> {
+    const [setting] = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
+    return setting;
+  }
+
+  async setSiteSetting(key: string, value: string): Promise<SiteSetting> {
+    const existing = await this.getSiteSetting(key);
+    if (existing) {
+      const [updated] = await db.update(siteSettings)
+        .set({ value, updatedAt: new Date() })
+        .where(eq(siteSettings.key, key))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(siteSettings)
+        .values({ key, value })
+        .returning();
+      return created;
+    }
   }
 }
 

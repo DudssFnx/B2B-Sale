@@ -248,3 +248,13 @@ export const insertAgendaEventSchema = createInsertSchema(agendaEvents).omit({
 
 export type InsertAgendaEvent = z.infer<typeof insertAgendaEventSchema>;
 export type AgendaEvent = typeof agendaEvents.$inferSelect;
+
+// Site settings for global configurations
+export const siteSettings = pgTable("site_settings", {
+  id: serial("id").primaryKey(),
+  key: text("key").notNull().unique(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type SiteSetting = typeof siteSettings.$inferSelect;
