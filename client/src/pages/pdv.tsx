@@ -4,7 +4,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Product, User } from "@shared/schema";
+import type { Product, User, Category } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ export default function PDVPage() {
   
   const [activeTab, setActiveTab] = useState("produto");
   const [productSearch, setProductSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [customerSearch, setCustomerSearch] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<User | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -72,15 +74,21 @@ export default function PDVPage() {
     enabled: showPDV,
   });
 
+  const { data: categoriesData = [] } = useQuery<Category[]>({
+    queryKey: ['/api/categories'],
+    enabled: showPDV,
+  });
+
   const productsData = productsResponse?.products || [];
   const approvedCustomers = customersData.filter(u => u.approved && u.role === "customer");
 
-  const filteredProducts = productSearch.length > 0 
-    ? productsData.filter(p => 
-        p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-        p.sku.toLowerCase().includes(productSearch.toLowerCase())
-      ).slice(0, 20)
-    : productsData.slice(0, 20);
+  const filteredProducts = productsData.filter(p => {
+    const matchesSearch = productSearch.length === 0 || 
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.sku.toLowerCase().includes(productSearch.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || p.categoryId === parseInt(selectedCategory);
+    return matchesSearch && matchesCategory;
+  }).slice(0, 30);
 
   const filteredCustomers = customerSearch.length > 0 
     ? approvedCustomers.filter(c => 
@@ -117,6 +125,7 @@ export default function PDVPage() {
     setPaymentMethod("");
     setPaymentNotes("");
     setProductSearch("");
+    setSelectedCategory("all");
     setCustomerSearch("");
     setActiveTab("produto");
   };
@@ -310,15 +319,30 @@ export default function PDVPage() {
 
             <TabsContent value="produto" className="flex-1 flex flex-col m-0 p-4 min-h-0">
               <div className="flex flex-col flex-1 min-h-0 gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Pesquisar por codigo, descricao ou SKU..."
-                    className="pl-10"
-                    value={productSearch}
-                    onChange={(e) => setProductSearch(e.target.value)}
-                    data-testid="input-pdv-product-search"
-                  />
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Pesquisar por codigo, descricao ou SKU..."
+                      className="pl-10"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      data-testid="input-pdv-product-search"
+                    />
+                  </div>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-48" data-testid="select-pdv-category">
+                      <SelectValue placeholder="Categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas Categorias</SelectItem>
+                      {categoriesData.map((cat) => (
+                        <SelectItem key={cat.id} value={cat.id.toString()}>
+                          {cat.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {selectedProduct ? (
