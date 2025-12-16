@@ -1447,9 +1447,9 @@ export async function registerRoutes(
   });
 
   // ========== FILE SERVING (public endpoint to serve object storage files) ==========
-  app.get('/api/files/*', async (req, res) => {
+  app.get('/api/files/*', async (req: any, res) => {
     try {
-      const filePath = req.params[0];
+      const filePath = req.params[0] as string;
       console.log('[FILE SERVE] Requested:', filePath);
       if (!filePath) {
         return res.status(400).json({ message: "File path required" });
@@ -1457,12 +1457,14 @@ export async function registerRoutes(
 
       const objectStorage = await getObjectStorage();
       const result = await objectStorage.downloadAsBytes(filePath);
-      console.log('[FILE SERVE] Result ok:', result?.ok, 'valueLength:', result?.value?.length);
       
-      if (!result || !result.ok) {
-        console.log('[FILE SERVE] File not found or error:', filePath);
+      if (!result || !result.ok || !result.value) {
+        console.log('[FILE SERVE] File not found or error:', filePath, 'result:', result);
         return res.status(404).json({ message: "File not found" });
       }
+      
+      const bytes = result.value as unknown as Uint8Array;
+      console.log('[FILE SERVE] Success - path:', filePath, 'bytes:', bytes.length);
 
       const ext = filePath.split('.').pop()?.toLowerCase() || '';
       const mimeTypes: Record<string, string> = {
@@ -1481,13 +1483,13 @@ export async function registerRoutes(
       };
       
       const contentType = mimeTypes[ext] || 'application/octet-stream';
-      const buffer = Buffer.from(result.value);
+      const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
       res.setHeader('Content-Type', contentType);
       res.setHeader('Content-Length', buffer.length);
       res.setHeader('Cache-Control', 'public, max-age=31536000');
       res.end(buffer);
     } catch (error: any) {
-      console.error("Error serving file:", error);
+      console.error("[FILE SERVE] Error:", error);
       if (error.message?.includes('not found') || error.message?.includes('NotFound')) {
         return res.status(404).json({ message: "File not found" });
       }
@@ -1538,7 +1540,7 @@ export async function registerRoutes(
       // Convert Node.js Buffer to Uint8Array for object storage compatibility
       console.log('[UPLOAD] File size:', file.buffer.length, 'bytes');
       const uint8Array = new Uint8Array(file.buffer.buffer, file.buffer.byteOffset, file.buffer.length);
-      await objectStorage.uploadFromBytes(filename, uint8Array);
+      await objectStorage.uploadFromBytes(filename, uint8Array as any);
       console.log('[UPLOAD] File uploaded successfully:', filename);
 
       const publicUrl = `/api/files/${filename}`;
@@ -1577,7 +1579,7 @@ export async function registerRoutes(
 
       const objectStorage = await getObjectStorage();
       const uint8Array = new Uint8Array(file.buffer.buffer, file.buffer.byteOffset, file.buffer.length);
-      await objectStorage.uploadFromBytes(filename, uint8Array);
+      await objectStorage.uploadFromBytes(filename, uint8Array as any);
 
       const publicUrl = `/api/files/${filename}`;
       res.json({ url: publicUrl, filename: filename });
