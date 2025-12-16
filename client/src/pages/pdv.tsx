@@ -686,59 +686,51 @@ export default function PDVPage() {
             </TabsContent>
 
             <TabsContent value="finalizar" className="flex-1 m-0 p-4 min-h-0">
-              <div className="flex flex-col gap-6">
-                <div className="space-y-4">
+              <div className="flex flex-col h-full">
+                <div className="mb-4">
                   <h3 className="text-lg font-semibold">Confirmar e Gerar</h3>
-                  <p className="text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Revise o pedido e escolha como deseja finalizar:
                   </p>
                 </div>
 
-                <Card>
-                  <CardContent className="p-4 space-y-3">
-                    <h4 className="font-medium">Resumo</h4>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Cliente</span>
-                      <span>{selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "Nao selecionado"}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Produtos</span>
-                      <span>{cartItemCount} itens</span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between font-bold">
-                      <span>Total</span>
-                      <span className="text-orange-500">{formatPrice(cartTotal)}</span>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="space-y-3 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Cliente</span>
+                    <span>{selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "Nao selecionado"}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Produtos</span>
+                    <span>{cartItemCount} itens</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between text-lg font-bold">
+                    <span>Total</span>
+                    <span className="text-orange-500">{formatPrice(cartTotal)}</span>
+                  </div>
+                </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex-1" />
+
+                <div className="flex justify-between items-center pt-4 border-t">
+                  <Button 
+                    variant="ghost"
+                    onClick={() => setActiveTab("pagamento")}
+                    data-testid="button-pdv-back-pagamento"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Voltar
+                  </Button>
                   <Button
-                    variant="outline"
                     size="lg"
-                    className="h-24 flex-col gap-2"
+                    className="bg-orange-500 hover:bg-orange-600"
                     onClick={() => {
                       toast({ title: "Orcamento", description: "Funcao de orcamento em desenvolvimento" });
                     }}
                     data-testid="button-pdv-generate-quote"
                   >
-                    <FileText className="h-8 w-8" />
-                    <span>Gerar Orcamento</span>
-                  </Button>
-                  <Button
-                    size="lg"
-                    className="h-24 flex-col gap-2 bg-orange-500 hover:bg-orange-600"
-                    onClick={handleFinalizeSale}
-                    disabled={createOrderMutation.isPending}
-                    data-testid="button-pdv-generate-order"
-                  >
-                    {createOrderMutation.isPending ? (
-                      <Loader2 className="h-8 w-8 animate-spin" />
-                    ) : (
-                      <ShoppingCart className="h-8 w-8" />
-                    )}
-                    <span>Gerar Pedido</span>
+                    <FileText className="h-5 w-5 mr-2" />
+                    Gerar Orcamento
                   </Button>
                 </div>
               </div>
