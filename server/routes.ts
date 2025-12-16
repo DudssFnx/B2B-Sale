@@ -1470,13 +1470,43 @@ export async function registerRoutes(
         buffer = rawBytes;
       } else if (rawBytes instanceof Uint8Array) {
         buffer = Buffer.from(rawBytes);
+      } else if (ArrayBuffer.isView(rawBytes)) {
+        buffer = Buffer.from((rawBytes as any).buffer, (rawBytes as any).byteOffset, (rawBytes as any).byteLength);
+      } else if (rawBytes instanceof ArrayBuffer) {
+        buffer = Buffer.from(rawBytes);
       } else if (Array.isArray(rawBytes)) {
-        buffer = Buffer.from(new Uint8Array(rawBytes as unknown as number[]));
+        if (rawBytes.length === 1 && Buffer.isBuffer(rawBytes[0])) {
+          buffer = rawBytes[0];
+        } else if (rawBytes.length > 0 && typeof rawBytes[0] === 'number') {
+          buffer = Buffer.from(new Uint8Array(rawBytes as unknown as number[]));
+        } else {
+          buffer = Buffer.concat(rawBytes.filter(Buffer.isBuffer));
+        }
       } else if (typeof rawBytes === 'object' && rawBytes !== null) {
-        const values = Object.values(rawBytes as unknown as Record<string, number>);
-        buffer = Buffer.from(new Uint8Array(values));
+        if ('buffer' in rawBytes && 'byteOffset' in rawBytes && 'byteLength' in rawBytes) {
+          const typed = rawBytes as { buffer: ArrayBuffer; byteOffset: number; byteLength: number };
+          buffer = Buffer.from(typed.buffer, typed.byteOffset, typed.byteLength);
+        } else if ('data' in rawBytes) {
+          const data = (rawBytes as any).data;
+          if (Buffer.isBuffer(data)) {
+            buffer = data;
+          } else if (Array.isArray(data)) {
+            buffer = Buffer.from(new Uint8Array(data));
+          } else {
+            buffer = Buffer.from(new Uint8Array(Object.values(data)));
+          }
+        } else {
+          const keys = Object.keys(rawBytes);
+          if (keys.length > 0 && keys.every(k => !isNaN(Number(k)))) {
+            const values = Object.values(rawBytes as unknown as Record<string, number>);
+            buffer = Buffer.from(new Uint8Array(values));
+          } else {
+            console.log('[FILE SERVE] Unknown object structure:', Object.keys(rawBytes).slice(0, 10));
+            return res.status(500).json({ message: "Invalid file data format" });
+          }
+        }
       } else {
-        console.log('[FILE SERVE] Unknown bytes type:', typeof rawBytes, rawBytes);
+        console.log('[FILE SERVE] Unknown bytes type:', typeof rawBytes);
         return res.status(500).json({ message: "Invalid file data format" });
       }
       
