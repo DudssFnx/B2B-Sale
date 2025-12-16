@@ -61,6 +61,7 @@ export default function PDVPage() {
   const [comment, setComment] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("");
   const [paymentNotes, setPaymentNotes] = useState("");
+  const [addedProductId, setAddedProductId] = useState<number | null>(null);
 
   const showPDV = isAdmin || isSales;
 
@@ -88,7 +89,7 @@ export default function PDVPage() {
       p.sku.toLowerCase().includes(productSearch.toLowerCase());
     const matchesCategory = selectedCategory === "all" || p.categoryId === parseInt(selectedCategory);
     return matchesSearch && matchesCategory;
-  }).slice(0, 30);
+  }).slice(0, 12);
 
   const filteredCustomers = customerSearch.length > 0 
     ? approvedCustomers.filter(c => 
@@ -163,7 +164,8 @@ export default function PDVPage() {
         subtotal: unitPrice
       }]);
     }
-    toast({ title: "Adicionado", description: `${product.name} +1` });
+    setAddedProductId(product.id);
+    setTimeout(() => setAddedProductId(null), 600);
   };
 
   const handleAddToCart = () => {
@@ -477,10 +479,15 @@ export default function PDVPage() {
                           >
                             <CardContent className="p-2">
                               <div className="relative">
+                                {addedProductId === product.id && (
+                                  <div className="absolute inset-0 z-20 flex items-center justify-center bg-green-500/80 rounded-md animate-in fade-in zoom-in duration-200">
+                                    <span className="text-white font-bold text-lg">+1</span>
+                                  </div>
+                                )}
                                 <Button
                                   variant="secondary"
                                   size="icon"
-                                  className="absolute -top-1 -right-1 h-6 w-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute top-1 right-1 h-6 w-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleSelectProduct(product);
@@ -490,7 +497,13 @@ export default function PDVPage() {
                                   <Eye className="h-3 w-3" />
                                 </Button>
                                 <div className="aspect-square bg-muted rounded-md mb-1 flex items-center justify-center overflow-hidden">
-                                  {product.images && product.images.length > 0 ? (
+                                  {product.image ? (
+                                    <img 
+                                      src={product.image} 
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : product.images && product.images.length > 0 ? (
                                     <img 
                                       src={product.images[0]} 
                                       alt={product.name}
@@ -510,6 +523,19 @@ export default function PDVPage() {
                       </div>
                     )}
                   </ScrollArea>
+                )}
+                
+                {cartItems.length > 0 && !selectedProduct && (
+                  <div className="flex justify-end pt-2 border-t mt-2">
+                    <Button 
+                      className="bg-orange-500 hover:bg-orange-600"
+                      onClick={() => setActiveTab("cliente")}
+                      data-testid="button-pdv-next-step-cliente"
+                    >
+                      Proxima Etapa
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
                 )}
               </div>
             </TabsContent>
@@ -582,6 +608,27 @@ export default function PDVPage() {
                     </div>
                   )}
                 </ScrollArea>
+                
+                {selectedCustomer && (
+                  <div className="flex justify-between pt-2 border-t mt-2">
+                    <Button 
+                      variant="ghost"
+                      onClick={() => setActiveTab("produto")}
+                      data-testid="button-pdv-back-produto"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Voltar
+                    </Button>
+                    <Button 
+                      className="bg-orange-500 hover:bg-orange-600"
+                      onClick={() => setActiveTab("pagamento")}
+                      data-testid="button-pdv-next-step-pagamento"
+                    >
+                      Proxima Etapa
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                )}
               </div>
             </TabsContent>
 
@@ -615,6 +662,25 @@ export default function PDVPage() {
                     <span>Total</span>
                     <span className="text-orange-500">{formatPrice(cartTotal)}</span>
                   </div>
+                </div>
+
+                <div className="flex justify-between pt-4 border-t">
+                  <Button 
+                    variant="ghost"
+                    onClick={() => setActiveTab("cliente")}
+                    data-testid="button-pdv-back-cliente"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Voltar
+                  </Button>
+                  <Button 
+                    className="bg-orange-500 hover:bg-orange-600"
+                    onClick={() => setActiveTab("finalizar")}
+                    data-testid="button-pdv-next-step-finalizar"
+                  >
+                    Proxima Etapa
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
                 </div>
               </div>
             </TabsContent>
