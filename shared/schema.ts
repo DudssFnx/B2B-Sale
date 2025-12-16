@@ -226,3 +226,24 @@ export const insertCouponSchema = createInsertSchema(coupons).omit({
 
 export type InsertCoupon = z.infer<typeof insertCouponSchema>;
 export type Coupon = typeof coupons.$inferSelect;
+
+// Agenda/Calendar events for admin panel
+export const agendaEvents = pgTable("agenda_events", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  date: timestamp("date").notNull(),
+  time: text("time"),
+  type: text("type").notNull().default("note"), // note, meeting, task, reminder
+  completed: boolean("completed").notNull().default(false),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertAgendaEventSchema = createInsertSchema(agendaEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertAgendaEvent = z.infer<typeof insertAgendaEventSchema>;
+export type AgendaEvent = typeof agendaEvents.$inferSelect;

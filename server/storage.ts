@@ -7,7 +7,8 @@ import {
   type PriceTable, type InsertPriceTable,
   type CustomerPrice, type InsertCustomerPrice,
   type Coupon, type InsertCoupon,
-  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons
+  type AgendaEvent, type InsertAgendaEvent,
+  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
@@ -112,6 +113,13 @@ export interface IStorage {
   
   // Stage Management
   updateOrderStage(orderId: number, stage: string): Promise<{ success: boolean; error?: string }>;
+
+  // Agenda Events
+  getAgendaEvents(filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]>;
+  getAgendaEvent(id: number): Promise<AgendaEvent | undefined>;
+  createAgendaEvent(event: InsertAgendaEvent): Promise<AgendaEvent>;
+  updateAgendaEvent(id: number, event: Partial<InsertAgendaEvent>): Promise<AgendaEvent | undefined>;
+  deleteAgendaEvent(id: number): Promise<boolean>;
 }
 
 // Customer Analytics Types
@@ -2197,6 +2205,46 @@ export class DatabaseStorage implements IStorage {
         lastQuarter: { orders: totalOrdersLastQuarter, revenue: Math.round(totalRevenueLastQuarter * 100) / 100 },
       },
     };
+  }
+
+  // ========== AGENDA EVENTS ==========
+  async getAgendaEvents(filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]> {
+    const conditions = [];
+    
+    if (filters?.startDate) {
+      conditions.push(sql`${agendaEvents.date} >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${agendaEvents.date} <= ${filters.endDate}`);
+    }
+    
+    if (conditions.length > 0) {
+      return db.select().from(agendaEvents)
+        .where(and(...conditions))
+        .orderBy(agendaEvents.date);
+    }
+    
+    return db.select().from(agendaEvents).orderBy(agendaEvents.date);
+  }
+
+  async getAgendaEvent(id: number): Promise<AgendaEvent | undefined> {
+    const [event] = await db.select().from(agendaEvents).where(eq(agendaEvents.id, id));
+    return event;
+  }
+
+  async createAgendaEvent(event: InsertAgendaEvent): Promise<AgendaEvent> {
+    const [newEvent] = await db.insert(agendaEvents).values(event).returning();
+    return newEvent;
+  }
+
+  async updateAgendaEvent(id: number, event: Partial<InsertAgendaEvent>): Promise<AgendaEvent | undefined> {
+    const [updated] = await db.update(agendaEvents).set(event).where(eq(agendaEvents.id, id)).returning();
+    return updated;
+  }
+
+  async deleteAgendaEvent(id: number): Promise<boolean> {
+    const result = await db.delete(agendaEvents).where(eq(agendaEvents.id, id)).returning();
+    return result.length > 0;
   }
 }
 

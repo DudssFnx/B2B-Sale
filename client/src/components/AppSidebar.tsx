@@ -33,6 +33,7 @@ import {
   ChevronRight,
   ExternalLink,
   ShoppingCart,
+  Calendar,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 type UserRole = "admin" | "sales" | "customer";
@@ -82,6 +83,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
     { title: "Clientes", url: "/customers", icon: UserCheck },
     { title: "Usuários", url: "/users", icon: Users },
     { title: "Cupons", url: "/coupons", icon: Ticket },
+    { title: "Agenda", url: "/agenda", icon: Calendar },
     { title: "Bling", url: "/bling", icon: Link2 },
     { title: "Configurações", url: "/settings", icon: Settings },
   ],

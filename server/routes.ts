@@ -1153,6 +1153,97 @@ export async function registerRoutes(
     }
   });
 
+  // ========== AGENDA EVENTS ==========
+  app.get('/api/agenda', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const startDate = req.query.startDate ? new Date(req.query.startDate) : undefined;
+      const endDate = req.query.endDate ? new Date(req.query.endDate) : undefined;
+      const events = await storage.getAgendaEvents({ startDate, endDate });
+      res.json(events);
+    } catch (error) {
+      console.error("Error fetching agenda events:", error);
+      res.status(500).json({ message: "Failed to fetch agenda events" });
+    }
+  });
+
+  app.get('/api/agenda/:id', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const event = await storage.getAgendaEvent(parseInt(req.params.id));
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch event" });
+    }
+  });
+
+  const agendaEventSchema = z.object({
+    title: z.string().min(1, "Title is required"),
+    description: z.string().optional().nullable(),
+    date: z.string().min(1, "Date is required"),
+    time: z.string().optional().nullable(),
+    type: z.enum(["note", "meeting", "task", "reminder"]).default("note"),
+    completed: z.boolean().optional(),
+  });
+
+  app.post('/api/agenda', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const validation = agendaEventSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid data", errors: validation.error.errors });
+      }
+      const eventData = {
+        title: validation.data.title,
+        description: validation.data.description || null,
+        date: new Date(validation.data.date),
+        time: validation.data.time || null,
+        type: validation.data.type,
+        completed: validation.data.completed || false,
+        createdBy: req.user?.id,
+      };
+      const event = await storage.createAgendaEvent(eventData);
+      res.status(201).json(event);
+    } catch (error) {
+      console.error("Error creating agenda event:", error);
+      res.status(500).json({ message: "Failed to create event" });
+    }
+  });
+
+  app.patch('/api/agenda/:id', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const partialSchema = agendaEventSchema.partial();
+      const validation = partialSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ message: "Invalid data", errors: validation.error.errors });
+      }
+      const updateData: any = { ...validation.data };
+      if (updateData.date) {
+        updateData.date = new Date(updateData.date);
+      }
+      const event = await storage.updateAgendaEvent(parseInt(req.params.id), updateData);
+      if (!event) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.json(event);
+    } catch (error) {
+      console.error("Error updating agenda event:", error);
+      res.status(500).json({ message: "Failed to update event" });
+    }
+  });
+
+  app.delete('/api/agenda/:id', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const success = await storage.deleteAgendaEvent(parseInt(req.params.id));
+      if (!success) {
+        return res.status(404).json({ message: "Event not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete event" });
+    }
+  });
+
   // ========== CSV Export ==========
   app.get('/api/orders/export/csv', isAuthenticated, isAdminOrSales, async (req: any, res) => {
     try {
