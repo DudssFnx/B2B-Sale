@@ -86,6 +86,7 @@ export const products = pgTable("products", {
   reservedStock: integer("reserved_stock").notNull().default(0),
   image: text("image"),
   images: text("images").array(),
+  featured: boolean("featured").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

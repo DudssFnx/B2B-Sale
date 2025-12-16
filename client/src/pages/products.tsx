@@ -29,7 +29,7 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Plus, Search, Pencil, Trash2, Loader2, Upload, Image, X, Copy } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Loader2, Upload, Image, X, Copy, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -48,6 +48,7 @@ interface ProductData {
   description: string | null;
   image: string | null;
   images: string[] | null;
+  featured: boolean;
 }
 
 const productSchema = z.object({
@@ -112,6 +113,7 @@ export default function ProductsPage() {
     description: p.description,
     image: p.image,
     images: p.images || null,
+    featured: p.featured || false,
   }));
 
   const form = useForm<ProductFormValues>({
@@ -228,6 +230,29 @@ export default function ProductsPage() {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
     },
   });
+
+  const toggleFeaturedMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("PATCH", `/api/products/${id}/toggle-featured`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+  });
+
+  const handleToggleFeatured = (product: ProductData) => {
+    toggleFeaturedMutation.mutate(product.id, {
+      onSuccess: () => {
+        toast({ 
+          title: product.featured ? "Removido dos destaques" : "Adicionado aos destaques",
+          description: product.name,
+        });
+      },
+      onError: () => {
+        toast({ title: "Erro", description: "Falha ao alterar destaque", variant: "destructive" });
+      },
+    });
+  };
 
   const openAddDialog = () => {
     form.reset({ name: "", sku: "", categoryId: "", brand: "", price: 0, cost: "", stock: 0, description: "" });
@@ -407,6 +432,16 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 justify-end">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleToggleFeatured(product)}
+                          title={product.featured ? "Remover destaque" : "Adicionar destaque"}
+                          disabled={toggleFeaturedMutation.isPending}
+                          data-testid={`button-featured-product-${product.id}`}
+                        >
+                          <Star className={`h-4 w-4 ${product.featured ? "fill-yellow-500 text-yellow-500" : ""}`} />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

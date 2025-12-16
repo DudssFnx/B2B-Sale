@@ -430,6 +430,20 @@ export async function registerRoutes(
     }
   });
 
+  app.patch('/api/products/:id/toggle-featured', isAuthenticated, isAdminOrSales, async (req, res) => {
+    try {
+      const productId = parseInt(req.params.id);
+      const product = await storage.getProduct(productId);
+      if (!product) {
+        return res.status(404).json({ message: "Product not found" });
+      }
+      const updated = await storage.updateProduct(productId, { featured: !product.featured });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to toggle featured status" });
+    }
+  });
+
   // ========== ORDERS ==========
   app.get('/api/orders', isAuthenticated, isApproved, async (req: any, res) => {
     try {
