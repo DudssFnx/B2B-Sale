@@ -27,7 +27,8 @@ import {
   Star,
   ArrowLeft,
   Loader2,
-  Percent
+  Percent,
+  Eye
 } from "lucide-react";
 
 interface CartItem {
@@ -129,6 +130,28 @@ export default function PDVPage() {
     setQuantity(1);
     setDiscount(0);
     setProductSearch("");
+  };
+
+  const handleQuickAddToCart = (product: Product) => {
+    const unitPrice = parseFloat(product.price);
+    const existingIndex = cartItems.findIndex(item => item.productId === product.id);
+    
+    if (existingIndex >= 0) {
+      const newItems = [...cartItems];
+      newItems[existingIndex].quantity += 1;
+      newItems[existingIndex].subtotal = unitPrice * newItems[existingIndex].quantity;
+      setCartItems(newItems);
+    } else {
+      setCartItems([...cartItems, {
+        productId: product.id,
+        product: product,
+        quantity: 1,
+        discount: 0,
+        unitPrice,
+        subtotal: unitPrice
+      }]);
+    }
+    toast({ title: "Adicionado", description: `${product.name} +1` });
   };
 
   const handleAddToCart = () => {
@@ -417,12 +440,12 @@ export default function PDVPage() {
                         {filteredProducts.map((product) => (
                           <Card 
                             key={product.id} 
-                            className="hover-elevate cursor-pointer"
-                            onClick={() => handleSelectProduct(product)}
+                            className="hover-elevate cursor-pointer relative group"
+                            onClick={() => handleQuickAddToCart(product)}
                             data-testid={`card-pdv-product-${product.id}`}
                           >
                             <CardContent className="p-3">
-                              <div className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center overflow-hidden">
+                              <div className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center overflow-hidden relative">
                                 {product.images && product.images.length > 0 ? (
                                   <img 
                                     src={product.images[0]} 
@@ -432,6 +455,18 @@ export default function PDVPage() {
                                 ) : (
                                   <Package className="h-8 w-8 text-muted-foreground" />
                                 )}
+                                <Button
+                                  variant="secondary"
+                                  size="icon"
+                                  className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleSelectProduct(product);
+                                  }}
+                                  data-testid={`button-pdv-view-product-${product.id}`}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                               </div>
                               <h4 className="font-medium text-sm truncate">{product.name}</h4>
                               <p className="text-xs text-muted-foreground truncate">{product.sku}</p>
@@ -642,7 +677,14 @@ export default function PDVPage() {
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
-                          <span className="w-8 text-center text-sm">{item.quantity}</span>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleUpdateQuantity(index, parseInt(e.target.value) || 1)}
+                            className="h-6 w-12 text-center text-sm p-1"
+                            data-testid={`input-pdv-cart-qty-${index}`}
+                          />
                           <Button 
                             variant="outline" 
                             size="icon" 
