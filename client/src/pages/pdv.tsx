@@ -443,7 +443,7 @@ export default function PDVPage() {
                         <p>Nenhum produto encontrado</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                         {filteredProducts.map((product) => (
                           <Card 
                             key={product.id} 
@@ -451,33 +451,35 @@ export default function PDVPage() {
                             onClick={() => handleQuickAddToCart(product)}
                             data-testid={`card-pdv-product-${product.id}`}
                           >
-                            <CardContent className="p-3">
-                              <div className="aspect-square bg-muted rounded-md mb-2 flex items-center justify-center overflow-hidden relative">
-                                {product.images && product.images.length > 0 ? (
-                                  <img 
-                                    src={product.images[0]} 
-                                    alt={product.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <Package className="h-8 w-8 text-muted-foreground" />
-                                )}
+                            <CardContent className="p-2">
+                              <div className="relative">
                                 <Button
                                   variant="secondary"
                                   size="icon"
-                                  className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  className="absolute -top-1 -right-1 h-6 w-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleSelectProduct(product);
                                   }}
                                   data-testid={`button-pdv-view-product-${product.id}`}
                                 >
-                                  <Eye className="h-4 w-4" />
+                                  <Eye className="h-3 w-3" />
                                 </Button>
+                                <div className="aspect-square bg-muted rounded-md mb-1 flex items-center justify-center overflow-hidden">
+                                  {product.images && product.images.length > 0 ? (
+                                    <img 
+                                      src={product.images[0]} 
+                                      alt={product.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <Package className="h-6 w-6 text-muted-foreground" />
+                                  )}
+                                </div>
                               </div>
-                              <h4 className="font-medium text-sm truncate">{product.name}</h4>
+                              <h4 className="font-medium text-xs truncate">{product.name}</h4>
                               <p className="text-xs text-muted-foreground truncate">{product.sku}</p>
-                              <p className="font-bold text-orange-500 mt-1">{formatPrice(parseFloat(product.price))}</p>
+                              <p className="font-bold text-orange-500 text-sm">{formatPrice(parseFloat(product.price))}</p>
                             </CardContent>
                           </Card>
                         ))}
