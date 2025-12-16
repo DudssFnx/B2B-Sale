@@ -26,9 +26,12 @@ import {
   Package,
   Star,
   ArrowLeft,
+  ArrowRight,
   Loader2,
   Percent,
-  Eye
+  Eye,
+  FileText,
+  CheckCircle
 } from "lucide-react";
 
 interface CartItem {
@@ -288,15 +291,19 @@ export default function PDVPage() {
               <TabsList className="bg-muted/50">
                 <TabsTrigger value="produto" className="gap-2" data-testid="tab-produto">
                   <Package className="h-4 w-4" />
-                  Produto
+                  1. Produtos
                 </TabsTrigger>
                 <TabsTrigger value="cliente" className="gap-2" data-testid="tab-cliente">
                   <UserIcon className="h-4 w-4" />
-                  Cliente
+                  2. Cliente
                 </TabsTrigger>
                 <TabsTrigger value="pagamento" className="gap-2" data-testid="tab-pagamento">
                   <CreditCard className="h-4 w-4" />
-                  Pagamento
+                  3. Pagamento
+                </TabsTrigger>
+                <TabsTrigger value="finalizar" className="gap-2" data-testid="tab-finalizar">
+                  <CheckCircle className="h-4 w-4" />
+                  4. Finalizar
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -585,6 +592,65 @@ export default function PDVPage() {
                 </div>
               </div>
             </TabsContent>
+
+            <TabsContent value="finalizar" className="flex-1 m-0 p-4 min-h-0">
+              <div className="flex flex-col gap-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Confirmar e Gerar</h3>
+                  <p className="text-muted-foreground">
+                    Revise o pedido e escolha como deseja finalizar:
+                  </p>
+                </div>
+
+                <Card>
+                  <CardContent className="p-4 space-y-3">
+                    <h4 className="font-medium">Resumo</h4>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Cliente</span>
+                      <span>{selectedCustomer ? `${selectedCustomer.firstName} ${selectedCustomer.lastName}` : "Nao selecionado"}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Produtos</span>
+                      <span>{cartItemCount} itens</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-bold">
+                      <span>Total</span>
+                      <span className="text-orange-500">{formatPrice(cartTotal)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-24 flex-col gap-2"
+                    onClick={() => {
+                      toast({ title: "Orcamento", description: "Funcao de orcamento em desenvolvimento" });
+                    }}
+                    data-testid="button-pdv-generate-quote"
+                  >
+                    <FileText className="h-8 w-8" />
+                    <span>Gerar Orcamento</span>
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="h-24 flex-col gap-2 bg-orange-500 hover:bg-orange-600"
+                    onClick={handleFinalizeSale}
+                    disabled={createOrderMutation.isPending}
+                    data-testid="button-pdv-generate-order"
+                  >
+                    {createOrderMutation.isPending ? (
+                      <Loader2 className="h-8 w-8 animate-spin" />
+                    ) : (
+                      <ShoppingCart className="h-8 w-8" />
+                    )}
+                    <span>Gerar Pedido</span>
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
           </Tabs>
 
           <div className="border-t p-4 flex items-center justify-between gap-4">
@@ -594,21 +660,51 @@ export default function PDVPage() {
               data-testid="button-pdv-cancel"
             >
               <X className="h-4 w-4 mr-2" />
-              Cancelar Venda
+              Cancelar
             </Button>
-            <Button 
-              className="bg-orange-500 hover:bg-orange-600 px-8"
-              onClick={handleFinalizeSale}
-              disabled={createOrderMutation.isPending}
-              data-testid="button-pdv-finalize"
-            >
-              {createOrderMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <ShoppingCart className="h-4 w-4 mr-2" />
+            
+            <div className="flex items-center gap-2">
+              {activeTab !== "produto" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (activeTab === "cliente") setActiveTab("produto");
+                    else if (activeTab === "pagamento") setActiveTab("cliente");
+                    else if (activeTab === "finalizar") setActiveTab("pagamento");
+                  }}
+                  data-testid="button-pdv-prev-step"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Voltar
+                </Button>
               )}
-              Finalizar Venda
-            </Button>
+              {activeTab !== "finalizar" && (
+                <Button 
+                  className="bg-orange-500 hover:bg-orange-600"
+                  onClick={() => {
+                    if (activeTab === "produto") {
+                      if (cartItems.length === 0) {
+                        toast({ title: "Aviso", description: "Adicione pelo menos um produto", variant: "destructive" });
+                        return;
+                      }
+                      setActiveTab("cliente");
+                    } else if (activeTab === "cliente") {
+                      if (!selectedCustomer) {
+                        toast({ title: "Aviso", description: "Selecione um cliente", variant: "destructive" });
+                        return;
+                      }
+                      setActiveTab("pagamento");
+                    } else if (activeTab === "pagamento") {
+                      setActiveTab("finalizar");
+                    }
+                  }}
+                  data-testid="button-pdv-next-step"
+                >
+                  Proxima Etapa
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
