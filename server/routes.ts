@@ -5,7 +5,7 @@ import { db } from "./db";
 import { products, orderItems, orders } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertCategorySchema, insertProductSchema, insertOrderSchema, insertOrderItemSchema, insertCouponSchema } from "@shared/schema";
+import { insertCategorySchema, insertProductSchema, insertOrderSchema, insertOrderItemSchema, insertCouponSchema, insertCatalogBannerSchema, insertCatalogSlideSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { Client } from "@replit/object-storage";
@@ -2662,6 +2662,119 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error generating PDF:", error);
       res.status(500).json({ message: "Failed to generate PDF" });
+    }
+  });
+
+  // ========== CATALOG BANNERS ==========
+  app.get("/api/catalog/banners", async (req, res) => {
+    try {
+      const position = req.query.position as string | undefined;
+      const banners = await storage.getCatalogBanners(position);
+      res.json(banners);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch banners" });
+    }
+  });
+
+  app.get("/api/catalog/banners/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const banner = await storage.getCatalogBanner(parseInt(req.params.id));
+      if (!banner) {
+        return res.status(404).json({ message: "Banner not found" });
+      }
+      res.json(banner);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch banner" });
+    }
+  });
+
+  app.post("/api/catalog/banners", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const data = insertCatalogBannerSchema.parse(req.body);
+      const banner = await storage.createCatalogBanner(data);
+      res.status(201).json(banner);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid banner data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create banner" });
+    }
+  });
+
+  app.patch("/api/catalog/banners/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const banner = await storage.updateCatalogBanner(parseInt(req.params.id), req.body);
+      if (!banner) {
+        return res.status(404).json({ message: "Banner not found" });
+      }
+      res.json(banner);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update banner" });
+    }
+  });
+
+  app.delete("/api/catalog/banners/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteCatalogBanner(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete banner" });
+    }
+  });
+
+  // ========== CATALOG SLIDES ==========
+  app.get("/api/catalog/slides", async (req, res) => {
+    try {
+      const slides = await storage.getCatalogSlides();
+      res.json(slides);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch slides" });
+    }
+  });
+
+  app.get("/api/catalog/slides/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const slide = await storage.getCatalogSlide(parseInt(req.params.id));
+      if (!slide) {
+        return res.status(404).json({ message: "Slide not found" });
+      }
+      res.json(slide);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch slide" });
+    }
+  });
+
+  app.post("/api/catalog/slides", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const data = insertCatalogSlideSchema.parse(req.body);
+      const slide = await storage.createCatalogSlide(data);
+      res.status(201).json(slide);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid slide data", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create slide" });
+    }
+  });
+
+  app.patch("/api/catalog/slides/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const slide = await storage.updateCatalogSlide(parseInt(req.params.id), req.body);
+      if (!slide) {
+        return res.status(404).json({ message: "Slide not found" });
+      }
+      res.json(slide);
+    } catch (error) {
+      res.status(400).json({ message: "Failed to update slide" });
+    }
+  });
+
+  app.delete("/api/catalog/slides/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deleteCatalogSlide(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete slide" });
     }
   });
 
