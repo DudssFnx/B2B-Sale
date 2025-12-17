@@ -83,14 +83,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
       ]
     },
     { title: "Categorias", url: "/categories", icon: Grid3X3 },
-    { 
-      title: "Catálogo", 
-      icon: Package,
-      subItems: [
-        { title: "Ver Catálogo", url: "/catalog", icon: Package },
-        { title: "Personalizar", url: "/catalog-customization", icon: Palette },
-      ]
-    },
+    { title: "Catálogo", url: "/catalog", icon: Package },
     { title: "Todos os Pedidos", url: "/orders", icon: ClipboardList },
     { title: "Produtos", url: "/products", icon: Package },
     { title: "Clientes", url: "/customers", icon: UserCheck },
