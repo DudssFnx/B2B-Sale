@@ -146,3 +146,28 @@ Gerencia despesas e dívidas com fornecedores:
 ### Controle de Acesso
 - **Contas a Receber**: Admin e Sales podem acessar
 - **Contas a Pagar**: Somente Admin pode acessar
+
+## Modo Delivery (Catálogo Estilo iFood)
+
+O sistema oferece um modo de catálogo alternativo inspirado em apps de delivery como iFood, Zé Delivery e Rappi.
+
+### Ativação
+- Acesse Configurações (Settings) → Catálogo
+- Ative "Modo Delivery" para transformar o catálogo
+
+### Características do Modo Delivery
+- **Design Mobile-First**: Interface otimizada para dispositivos móveis
+- **Scroll Horizontal de Categorias**: Navegação rápida entre categorias
+- **Cards de Produto Grandes**: Visualização destacada com imagem, preço e controles de quantidade
+- **Controles de Quantidade Diretos**: Botões + e - para ajustar quantidade sem abrir modal
+- **Seção de Destaques**: Produtos em destaque aparecem no topo quando não há busca/filtro ativo
+- **Paginação**: 24 produtos por página com navegação anterior/próxima
+- **Busca Integrada**: Campo de busca na barra fixa superior
+
+### Componente
+- `client/src/components/DeliveryCatalog.tsx` - Componente do catálogo delivery
+- Usa setting key: `delivery_catalog_mode` (true/false)
+
+### Funcionamento
+- Quando ativado, substitui o catálogo padrão tanto na área autenticada quanto no catálogo público
+- Mantém todas as funcionalidades de carrinho e checkout
