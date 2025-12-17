@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { useSearch } from "wouter";
 import { CatalogFilters } from "@/components/CatalogFilters";
 import { ProductGrid } from "@/components/ProductGrid";
+import { DeliveryCatalog } from "@/components/DeliveryCatalog";
 import { Loader2, Package, ChevronLeft, ChevronRight, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Product } from "@/components/ProductCard";
@@ -35,6 +36,12 @@ export default function CatalogPage() {
   const { data: slides = [] } = useQuery<CatalogSlide[]>({
     queryKey: ['/api/catalog/slides'],
   });
+
+  const { data: deliveryModeSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/delivery_catalog_mode'],
+  });
+
+  const isDeliveryMode = deliveryModeSetting?.value === 'true';
 
   const activeSlides = slides.filter(s => s.active);
 
@@ -180,6 +187,10 @@ export default function CatalogPage() {
     setCategory("all");
     setBrand("all");
   };
+
+  if (isDeliveryMode) {
+    return <DeliveryCatalog isPublic={false} />;
+  }
 
   return (
     <div className="space-y-4">

@@ -27,6 +27,7 @@ import type { Product as SchemaProduct, Category } from "@shared/schema";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
+import { DeliveryCatalog } from "@/components/DeliveryCatalog";
 import logoImage from "@assets/image_1765659931449.png";
 
 interface ProductsResponse {
@@ -59,6 +60,12 @@ export default function PublicCatalogPage() {
       return res.json();
     },
   });
+
+  const { data: deliveryModeSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/delivery_catalog_mode'],
+  });
+
+  const isDeliveryMode = deliveryModeSetting?.value === 'true';
 
   useEffect(() => {
     const params = new URLSearchParams(searchString);
@@ -199,6 +206,60 @@ export default function PublicCatalogPage() {
 
     setQuantities(prev => ({ ...prev, [product.id]: 0 }));
   };
+
+  if (isDeliveryMode) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-50 bg-zinc-900 text-white">
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <img 
+                  src={logoImage} 
+                  alt="Lojamadrugadao" 
+                  className="h-10 w-10 rounded-full border-2 border-white/20 cursor-pointer"
+                  onClick={() => setLocation("/")}
+                  data-testid="img-logo"
+                />
+                <div className="hidden sm:block">
+                  <h1 className="font-bold text-sm tracking-wide cursor-pointer" onClick={() => setLocation("/")}>
+                    LOJAMADRUGADAO
+                  </h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white relative"
+                  onClick={openCart}
+                  data-testid="button-cart"
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  {itemCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 min-w-[20px] flex items-center justify-center text-xs">
+                      {itemCount}
+                    </Badge>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white"
+                  onClick={() => setLocation("/login")}
+                  data-testid="button-login"
+                >
+                  <User className="h-5 w-5" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+        <DeliveryCatalog isPublic={true} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

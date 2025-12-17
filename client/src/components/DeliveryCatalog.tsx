@@ -24,6 +24,7 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [page, setPage] = useState(1);
   const { addItem } = useCart();
   const { toast } = useToast();
   const categoryScrollRef = useRef<HTMLDivElement>(null);
@@ -41,11 +42,12 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('limit', '100');
+    params.set('page', String(page));
+    params.set('limit', '24');
     if (selectedCategory) params.set('categoryId', String(selectedCategory));
     if (searchQuery) params.set('search', searchQuery);
     return params.toString();
-  }, [selectedCategory, searchQuery]);
+  }, [selectedCategory, searchQuery, page]);
 
   const { data: productsResponse, isLoading } = useQuery<ProductsResponse>({
     queryKey: [`${apiPrefix}/products`, queryParams],
@@ -57,8 +59,20 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
   });
 
   const products = productsResponse?.products || [];
+  const totalPages = productsResponse?.totalPages || 1;
+  const totalProducts = productsResponse?.total || 0;
   const featuredProducts = products.filter(p => p.featured);
   const regularProducts = products.filter(p => !p.featured);
+
+  const handleCategoryChange = (catId: number | null) => {
+    setSelectedCategory(catId);
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+  };
 
   const updateQuantity = (productId: number, delta: number) => {
     setQuantities(prev => ({
@@ -79,7 +93,7 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
     }
 
     addItem({
-      productId: product.id,
+      productId: String(product.id),
       name: product.name,
       sku: product.sku,
       price: Number(product.price),
@@ -222,7 +236,7 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
             <Input
               placeholder="Buscar produtos..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10 h-12 text-base rounded-full bg-muted/50"
               data-testid="input-search-delivery"
             />
@@ -248,7 +262,7 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
                 variant={selectedCategory === null ? "default" : "outline"}
                 size="sm"
                 className="rounded-full whitespace-nowrap shrink-0"
-                onClick={() => setSelectedCategory(null)}
+                onClick={() => handleCategoryChange(null)}
                 data-testid="button-category-all"
               >
                 Todos
@@ -259,7 +273,7 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
                   variant={selectedCategory === cat.id ? "default" : "outline"}
                   size="sm"
                   className="rounded-full whitespace-nowrap shrink-0"
-                  onClick={() => setSelectedCategory(cat.id)}
+                  onClick={() => handleCategoryChange(cat.id)}
                   data-testid={`button-category-${cat.id}`}
                 >
                   {cat.name}
@@ -318,6 +332,39 @@ export function DeliveryCatalog({ isPublic = false }: DeliveryCatalogProps) {
               {(searchQuery || selectedCategory ? products : regularProducts).map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 py-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                data-testid="button-prev-page"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Anterior
+              </Button>
+              <div className="flex items-center gap-1 px-3">
+                <span className="text-sm text-muted-foreground">
+                  Página {page} de {totalPages}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  ({totalProducts} produtos)
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                data-testid="button-next-page"
+              >
+                Próxima
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
           )}
         </section>
