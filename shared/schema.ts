@@ -317,3 +317,57 @@ export const catalogConfig = pgTable("catalog_config", {
 });
 
 export type CatalogConfig = typeof catalogConfig.$inferSelect;
+
+// Customer Credit (Fiado) - Store credit transactions
+// TYPE:
+// - DEBITO: Amount added to customer debt (purchase on credit)
+// - CREDITO: Payment received (reduces debt)
+// STATUS:
+// - PENDENTE: Pending payment
+// - PARCIAL: Partially paid
+// - PAGO: Fully paid
+// - VENCIDO: Overdue
+// - CANCELADO: Cancelled
+export const customerCredits = pgTable("customer_credits", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  orderId: integer("order_id").references(() => orders.id), // Optional link to order
+  type: text("type").notNull(), // DEBITO, CREDITO
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  description: text("description"),
+  status: text("status").notNull().default("PENDENTE"), // PENDENTE, PARCIAL, PAGO, VENCIDO, CANCELADO
+  dueDate: timestamp("due_date"), // Data de vencimento
+  paidAt: timestamp("paid_at"), // Data do pagamento
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertCustomerCreditSchema = createInsertSchema(customerCredits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertCustomerCredit = z.infer<typeof insertCustomerCreditSchema>;
+export type CustomerCredit = typeof customerCredits.$inferSelect;
+
+// Customer credit payments - individual payments for a credit entry
+export const creditPayments = pgTable("credit_payments", {
+  id: serial("id").primaryKey(),
+  creditId: integer("credit_id").notNull().references(() => customerCredits.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method"), // PIX, DINHEIRO, CARTAO, BOLETO, TRANSFERENCIA
+  notes: text("notes"),
+  receivedBy: varchar("received_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertCreditPaymentSchema = createInsertSchema(creditPayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCreditPayment = z.infer<typeof insertCreditPaymentSchema>;
+export type CreditPayment = typeof creditPayments.$inferSelect;

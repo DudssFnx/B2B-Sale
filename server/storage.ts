@@ -12,7 +12,9 @@ import {
   type CatalogBanner, type InsertCatalogBanner,
   type CatalogSlide, type InsertCatalogSlide,
   type CatalogConfig,
-  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig
+  type CustomerCredit, type InsertCustomerCredit,
+  type CreditPayment, type InsertCreditPayment,
+  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
@@ -146,6 +148,20 @@ export interface IStorage {
   // Catalog Config
   getCatalogConfig(key: string): Promise<CatalogConfig | undefined>;
   setCatalogConfig(key: string, value: string): Promise<CatalogConfig>;
+
+  // Customer Credits (Fiado)
+  getCustomerCredits(userId: string): Promise<CustomerCredit[]>;
+  getAllCredits(): Promise<CustomerCredit[]>;
+  getCustomerCredit(id: number): Promise<CustomerCredit | undefined>;
+  createCustomerCredit(credit: InsertCustomerCredit): Promise<CustomerCredit>;
+  updateCustomerCredit(id: number, credit: Partial<InsertCustomerCredit>): Promise<CustomerCredit | undefined>;
+  deleteCustomerCredit(id: number): Promise<boolean>;
+  getCustomerCreditBalance(userId: string): Promise<{ total: number; pending: number; paid: number }>;
+  getCreditsDashboard(): Promise<CreditsDashboardData>;
+
+  // Credit Payments
+  getCreditPayments(creditId: number): Promise<CreditPayment[]>;
+  createCreditPayment(payment: InsertCreditPayment): Promise<CreditPayment>;
 }
 
 // Customer Analytics Types
@@ -440,6 +456,54 @@ export interface EmployeeAnalyticsData {
     thisQuarter: { orders: number; revenue: number };
     lastQuarter: { orders: number; revenue: number };
   };
+}
+
+// Credits Dashboard Types
+export interface CustomerCreditSummary {
+  userId: string;
+  userName: string;
+  company: string | null;
+  totalDebt: number;
+  paidAmount: number;
+  pendingAmount: number;
+  overdueAmount: number;
+  nextDueDate: Date | null;
+  creditCount: number;
+}
+
+export interface UpcomingPayment {
+  creditId: number;
+  userId: string;
+  userName: string;
+  company: string | null;
+  amount: number;
+  pendingAmount: number;
+  dueDate: Date;
+  daysUntilDue: number;
+  status: string;
+}
+
+export interface CreditsDashboardData {
+  overview: {
+    totalInCirculation: number;
+    totalPending: number;
+    totalPaid: number;
+    totalOverdue: number;
+    customersWithDebt: number;
+    averageDebtPerCustomer: number;
+  };
+  customerSummaries: CustomerCreditSummary[];
+  upcomingPayments: UpcomingPayment[];
+  overduePayments: UpcomingPayment[];
+  recentPayments: Array<{
+    paymentId: number;
+    creditId: number;
+    userId: string;
+    userName: string;
+    amount: number;
+    paymentMethod: string | null;
+    createdAt: Date;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2390,6 +2454,235 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // ========== CUSTOMER CREDITS (FIADO) ==========
+  async getCustomerCredits(userId: string): Promise<CustomerCredit[]> {
+    return db.select().from(customerCredits)
+      .where(eq(customerCredits.userId, userId))
+      .orderBy(desc(customerCredits.createdAt));
+  }
+
+  async getAllCredits(): Promise<CustomerCredit[]> {
+    return db.select().from(customerCredits)
+      .orderBy(desc(customerCredits.createdAt));
+  }
+
+  async getCustomerCredit(id: number): Promise<CustomerCredit | undefined> {
+    const [credit] = await db.select().from(customerCredits).where(eq(customerCredits.id, id));
+    return credit;
+  }
+
+  async createCustomerCredit(credit: InsertCustomerCredit): Promise<CustomerCredit> {
+    const [newCredit] = await db.insert(customerCredits).values(credit).returning();
+    return newCredit;
+  }
+
+  async updateCustomerCredit(id: number, credit: Partial<InsertCustomerCredit>): Promise<CustomerCredit | undefined> {
+    const [updated] = await db.update(customerCredits)
+      .set({ ...credit, updatedAt: new Date() })
+      .where(eq(customerCredits.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCustomerCredit(id: number): Promise<boolean> {
+    await db.delete(creditPayments).where(eq(creditPayments.creditId, id));
+    const result = await db.delete(customerCredits).where(eq(customerCredits.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getCustomerCreditBalance(userId: string): Promise<{ total: number; pending: number; paid: number }> {
+    const credits = await this.getCustomerCredits(userId);
+    
+    let total = 0;
+    let paid = 0;
+    
+    for (const credit of credits) {
+      if (credit.type === 'DEBITO' && credit.status !== 'CANCELADO') {
+        total += parseFloat(credit.amount);
+        paid += parseFloat(credit.paidAmount);
+      }
+    }
+    
+    return {
+      total,
+      pending: total - paid,
+      paid
+    };
+  }
+
+  async getCreditsDashboard(): Promise<CreditsDashboardData> {
+    const allCredits = await db.select({
+      credit: customerCredits,
+      user: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        company: users.company,
+      }
+    })
+    .from(customerCredits)
+    .leftJoin(users, eq(customerCredits.userId, users.id))
+    .orderBy(desc(customerCredits.createdAt));
+
+    const now = new Date();
+    let totalInCirculation = 0;
+    let totalPending = 0;
+    let totalPaid = 0;
+    let totalOverdue = 0;
+    const customerDebts: Map<string, CustomerCreditSummary> = new Map();
+    const upcomingPayments: UpcomingPayment[] = [];
+    const overduePayments: UpcomingPayment[] = [];
+
+    for (const { credit, user } of allCredits) {
+      if (credit.type !== 'DEBITO' || credit.status === 'CANCELADO') continue;
+
+      const amount = parseFloat(credit.amount);
+      const paidAmount = parseFloat(credit.paidAmount);
+      const pendingAmount = amount - paidAmount;
+      const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Cliente';
+
+      totalInCirculation += amount;
+      totalPaid += paidAmount;
+
+      if (credit.status === 'PAGO') {
+        // Already fully paid
+      } else if (credit.dueDate && new Date(credit.dueDate) < now) {
+        totalOverdue += pendingAmount;
+        overduePayments.push({
+          creditId: credit.id,
+          userId: credit.userId,
+          userName,
+          company: user?.company || null,
+          amount,
+          pendingAmount,
+          dueDate: new Date(credit.dueDate),
+          daysUntilDue: Math.floor((new Date(credit.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+          status: 'VENCIDO'
+        });
+      } else {
+        totalPending += pendingAmount;
+        if (credit.dueDate) {
+          upcomingPayments.push({
+            creditId: credit.id,
+            userId: credit.userId,
+            userName,
+            company: user?.company || null,
+            amount,
+            pendingAmount,
+            dueDate: new Date(credit.dueDate),
+            daysUntilDue: Math.floor((new Date(credit.dueDate).getTime() - now.getTime()) / (1000 * 60 * 60 * 24)),
+            status: credit.status
+          });
+        }
+      }
+
+      // Customer summary
+      const existing = customerDebts.get(credit.userId);
+      if (existing) {
+        existing.totalDebt += amount;
+        existing.paidAmount += paidAmount;
+        existing.pendingAmount += pendingAmount;
+        existing.creditCount += 1;
+        if (credit.dueDate && new Date(credit.dueDate) < now) {
+          existing.overdueAmount += pendingAmount;
+        }
+        if (credit.dueDate && (!existing.nextDueDate || new Date(credit.dueDate) < existing.nextDueDate)) {
+          if (credit.status !== 'PAGO') {
+            existing.nextDueDate = new Date(credit.dueDate);
+          }
+        }
+      } else {
+        customerDebts.set(credit.userId, {
+          userId: credit.userId,
+          userName,
+          company: user?.company || null,
+          totalDebt: amount,
+          paidAmount,
+          pendingAmount,
+          overdueAmount: credit.dueDate && new Date(credit.dueDate) < now ? pendingAmount : 0,
+          nextDueDate: credit.dueDate && credit.status !== 'PAGO' ? new Date(credit.dueDate) : null,
+          creditCount: 1
+        });
+      }
+    }
+
+    // Get recent payments
+    const recentPaymentsResult = await db.select({
+      payment: creditPayments,
+      credit: customerCredits,
+      user: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+      }
+    })
+    .from(creditPayments)
+    .leftJoin(customerCredits, eq(creditPayments.creditId, customerCredits.id))
+    .leftJoin(users, eq(customerCredits.userId, users.id))
+    .orderBy(desc(creditPayments.createdAt))
+    .limit(10);
+
+    const recentPayments = recentPaymentsResult.map(({ payment, credit, user }) => ({
+      paymentId: payment.id,
+      creditId: payment.creditId,
+      userId: credit?.userId || '',
+      userName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Cliente',
+      amount: parseFloat(payment.amount),
+      paymentMethod: payment.paymentMethod,
+      createdAt: payment.createdAt
+    }));
+
+    const customersWithDebt = Array.from(customerDebts.values()).filter(c => c.pendingAmount > 0).length;
+
+    return {
+      overview: {
+        totalInCirculation,
+        totalPending,
+        totalPaid,
+        totalOverdue,
+        customersWithDebt,
+        averageDebtPerCustomer: customersWithDebt > 0 ? totalPending / customersWithDebt : 0
+      },
+      customerSummaries: Array.from(customerDebts.values()).sort((a, b) => b.pendingAmount - a.pendingAmount),
+      upcomingPayments: upcomingPayments.sort((a, b) => a.daysUntilDue - b.daysUntilDue).slice(0, 20),
+      overduePayments: overduePayments.sort((a, b) => a.daysUntilDue - b.daysUntilDue),
+      recentPayments
+    };
+  }
+
+  // ========== CREDIT PAYMENTS ==========
+  async getCreditPayments(creditId: number): Promise<CreditPayment[]> {
+    return db.select().from(creditPayments)
+      .where(eq(creditPayments.creditId, creditId))
+      .orderBy(desc(creditPayments.createdAt));
+  }
+
+  async createCreditPayment(payment: InsertCreditPayment): Promise<CreditPayment> {
+    const [newPayment] = await db.insert(creditPayments).values(payment).returning();
+    
+    // Update credit's paid amount
+    const credit = await this.getCustomerCredit(payment.creditId);
+    if (credit) {
+      const newPaidAmount = parseFloat(credit.paidAmount) + parseFloat(payment.amount);
+      const totalAmount = parseFloat(credit.amount);
+      
+      let newStatus = credit.status;
+      if (newPaidAmount >= totalAmount) {
+        newStatus = 'PAGO';
+      } else if (newPaidAmount > 0) {
+        newStatus = 'PARCIAL';
+      }
+      
+      await this.updateCustomerCredit(payment.creditId, {
+        paidAmount: newPaidAmount.toFixed(2),
+        status: newStatus,
+        paidAt: newStatus === 'PAGO' ? new Date() : undefined
+      });
+    }
+    
+    return newPayment;
   }
 }
 

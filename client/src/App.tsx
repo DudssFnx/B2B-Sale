@@ -37,6 +37,7 @@ import CheckoutPage from "@/pages/checkout";
 import AgendaPage from "@/pages/agenda";
 import CatalogCustomizationPage from "@/pages/catalog-customization";
 import PDVPage from "@/pages/pdv";
+import FiadoPage from "@/pages/fiado";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 function AuthenticatedApp() {
@@ -114,6 +115,7 @@ function AuthenticatedApp() {
               {isAdmin && <Route path="/purchases" component={PurchasesDashboardPage} />}
               {isAdmin && <Route path="/agenda" component={AgendaPage} />}
               {isAdmin && <Route path="/catalog-customization" component={CatalogCustomizationPage} />}
+              <Route path="/fiado" component={FiadoPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

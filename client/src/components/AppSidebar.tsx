@@ -35,6 +35,7 @@ import {
   ShoppingCart,
   Calendar,
   Palette,
+  Wallet,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 type UserRole = "admin" | "sales" | "customer";
@@ -64,6 +65,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
     { title: "Categorias", url: "/categories", icon: Grid3X3 },
     { title: "Catálogo", url: "/catalog", icon: Package },
     { title: "Todos os Pedidos", url: "/orders", icon: ClipboardList },
+    { title: "Fiado", url: "/fiado", icon: Wallet },
   ],
   admin: [
     { 
@@ -91,6 +93,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
     { title: "Clientes", url: "/customers", icon: UserCheck },
     { title: "Usuários", url: "/users", icon: Users },
     { title: "Cupons", url: "/coupons", icon: Ticket },
+    { title: "Fiado", url: "/fiado", icon: Wallet },
     { title: "Agenda", url: "/agenda", icon: Calendar },
     { title: "Bling", url: "/bling", icon: Link2 },
     { title: "Configurações", url: "/settings", icon: Settings },

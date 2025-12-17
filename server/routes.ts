@@ -1258,6 +1258,169 @@ export async function registerRoutes(
     }
   });
 
+  // ========== CUSTOMER CREDITS (FIADO) ==========
+  
+  // Get credits dashboard (admin/sales only)
+  app.get('/api/credits/dashboard', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const dashboard = await storage.getCreditsDashboard();
+      res.json(dashboard);
+    } catch (error) {
+      console.error("Error fetching credits dashboard:", error);
+      res.status(500).json({ message: "Failed to fetch credits dashboard" });
+    }
+  });
+
+  // Get all credits (admin/sales only)
+  app.get('/api/credits', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const credits = await storage.getAllCredits();
+      res.json(credits);
+    } catch (error) {
+      console.error("Error fetching credits:", error);
+      res.status(500).json({ message: "Failed to fetch credits" });
+    }
+  });
+
+  // Get credits for a specific customer
+  app.get('/api/credits/customer/:userId', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const credits = await storage.getCustomerCredits(req.params.userId);
+      const balance = await storage.getCustomerCreditBalance(req.params.userId);
+      res.json({ credits, balance });
+    } catch (error) {
+      console.error("Error fetching customer credits:", error);
+      res.status(500).json({ message: "Failed to fetch customer credits" });
+    }
+  });
+
+  // Get single credit with payments
+  app.get('/api/credits/:id', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const credit = await storage.getCustomerCredit(parseInt(req.params.id));
+      if (!credit) {
+        return res.status(404).json({ message: "Credit not found" });
+      }
+      const payments = await storage.getCreditPayments(credit.id);
+      res.json({ credit, payments });
+    } catch (error) {
+      console.error("Error fetching credit:", error);
+      res.status(500).json({ message: "Failed to fetch credit" });
+    }
+  });
+
+  // Create a new credit entry (debt or credit)
+  app.post('/api/credits', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const { userId, type, amount, description, dueDate, orderId } = req.body;
+      
+      if (!userId || !type || !amount) {
+        return res.status(400).json({ message: "userId, type and amount are required" });
+      }
+      
+      if (!['DEBITO', 'CREDITO'].includes(type)) {
+        return res.status(400).json({ message: "type must be DEBITO or CREDITO" });
+      }
+      
+      const credit = await storage.createCustomerCredit({
+        userId,
+        type,
+        amount: parseFloat(amount).toFixed(2),
+        paidAmount: "0",
+        description: description || null,
+        status: 'PENDENTE',
+        dueDate: dueDate ? new Date(dueDate) : null,
+        orderId: orderId || null,
+        createdBy: req.user.id
+      });
+      
+      res.status(201).json(credit);
+    } catch (error) {
+      console.error("Error creating credit:", error);
+      res.status(500).json({ message: "Failed to create credit" });
+    }
+  });
+
+  // Update credit entry
+  app.patch('/api/credits/:id', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const { description, dueDate, status } = req.body;
+      
+      const updateData: any = {};
+      if (description !== undefined) updateData.description = description;
+      if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
+      if (status !== undefined) updateData.status = status;
+      
+      const credit = await storage.updateCustomerCredit(parseInt(req.params.id), updateData);
+      if (!credit) {
+        return res.status(404).json({ message: "Credit not found" });
+      }
+      
+      res.json(credit);
+    } catch (error) {
+      console.error("Error updating credit:", error);
+      res.status(500).json({ message: "Failed to update credit" });
+    }
+  });
+
+  // Delete credit entry
+  app.delete('/api/credits/:id', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const success = await storage.deleteCustomerCredit(parseInt(req.params.id));
+      if (!success) {
+        return res.status(404).json({ message: "Credit not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting credit:", error);
+      res.status(500).json({ message: "Failed to delete credit" });
+    }
+  });
+
+  // Register a payment for a credit
+  app.post('/api/credits/:id/payments', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const creditId = parseInt(req.params.id);
+      const { amount, paymentMethod, notes } = req.body;
+      
+      if (!amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Valid amount is required" });
+      }
+      
+      const credit = await storage.getCustomerCredit(creditId);
+      if (!credit) {
+        return res.status(404).json({ message: "Credit not found" });
+      }
+      
+      const payment = await storage.createCreditPayment({
+        creditId,
+        amount: parseFloat(amount).toFixed(2),
+        paymentMethod: paymentMethod || null,
+        notes: notes || null,
+        receivedBy: req.user.id
+      });
+      
+      // Fetch updated credit
+      const updatedCredit = await storage.getCustomerCredit(creditId);
+      
+      res.status(201).json({ payment, credit: updatedCredit });
+    } catch (error) {
+      console.error("Error registering payment:", error);
+      res.status(500).json({ message: "Failed to register payment" });
+    }
+  });
+
+  // Get payments for a credit
+  app.get('/api/credits/:id/payments', isAuthenticated, isAdminOrSales, async (req: any, res) => {
+    try {
+      const payments = await storage.getCreditPayments(parseInt(req.params.id));
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
   // ========== SITE SETTINGS ==========
   app.get('/api/settings/:key', async (req, res) => {
     try {
