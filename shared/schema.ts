@@ -72,12 +72,42 @@ export const insertCategorySchema = createInsertSchema(categories).omit({
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type Category = typeof categories.$inferSelect;
 
+// Suppliers table
+export const suppliers = pgTable("suppliers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  tradingName: text("trading_name"),
+  cnpj: text("cnpj"),
+  email: text("email"),
+  phone: text("phone"),
+  contact: text("contact"),
+  cep: text("cep"),
+  address: text("address"),
+  addressNumber: text("address_number"),
+  complement: text("complement"),
+  neighborhood: text("neighborhood"),
+  city: text("city"),
+  state: text("state"),
+  notes: text("notes"),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
 // Products table
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   sku: text("sku").notNull().unique(),
   categoryId: integer("category_id").references(() => categories.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
   brand: text("brand"),
   description: text("description"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
@@ -91,6 +121,19 @@ export const products = pgTable("products", {
   width: decimal("width", { precision: 10, scale: 2 }),
   height: decimal("height", { precision: 10, scale: 2 }),
   depth: decimal("depth", { precision: 10, scale: 2 }),
+  gtin: text("gtin"),
+  gtinTributario: text("gtin_tributario"),
+  origem: text("origem"),
+  ncm: text("ncm"),
+  cest: text("cest"),
+  tipoItem: text("tipo_item"),
+  percentualTributos: decimal("percentual_tributos", { precision: 5, scale: 2 }),
+  valorBaseIcmsStRetencao: decimal("valor_base_icms_st_retencao", { precision: 10, scale: 2 }),
+  valorIcmsStRetencao: decimal("valor_icms_st_retencao", { precision: 10, scale: 2 }),
+  valorIcmsProprioSubstituto: decimal("valor_icms_proprio_substituto", { precision: 10, scale: 2 }),
+  codigoExcecaoTipi: text("codigo_excecao_tipi"),
+  valorPisFixo: decimal("valor_pis_fixo", { precision: 10, scale: 4 }),
+  valorCofinsFixo: decimal("valor_cofins_fixo", { precision: 10, scale: 4 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

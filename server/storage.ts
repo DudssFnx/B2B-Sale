@@ -1,6 +1,7 @@
 import { 
   type User, type InsertUser, type UpsertUser,
   type Category, type InsertCategory,
+  type Supplier, type InsertSupplier,
   type Product, type InsertProduct,
   type Order, type InsertOrder,
   type OrderItem, type InsertOrderItem,
@@ -18,7 +19,7 @@ import {
   type PayablePayment, type InsertPayablePayment,
   type Module, type InsertModule,
   type UserModulePermission, type InsertUserModulePermission,
-  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments, accountsPayable, payablePayments, modules, userModulePermissions
+  users, categories, suppliers, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments, accountsPayable, payablePayments, modules, userModulePermissions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
@@ -39,6 +40,13 @@ export interface IStorage {
   createCategory(category: InsertCategory): Promise<Category>;
   updateCategory(id: number, category: Partial<InsertCategory>): Promise<Category | undefined>;
   deleteCategory(id: number): Promise<boolean>;
+
+  // Suppliers
+  getSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: number): Promise<Supplier | undefined>;
+  createSupplier(supplier: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+  deleteSupplier(id: number): Promise<boolean>;
 
   // Products
   getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
@@ -589,6 +597,31 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCategory(id: number): Promise<boolean> {
     await db.delete(categories).where(eq(categories.id, id));
+    return true;
+  }
+
+  // Suppliers
+  async getSuppliers(): Promise<Supplier[]> {
+    return db.select().from(suppliers).orderBy(suppliers.name);
+  }
+
+  async getSupplier(id: number): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier;
+  }
+
+  async createSupplier(insertSupplier: InsertSupplier): Promise<Supplier> {
+    const [supplier] = await db.insert(suppliers).values(insertSupplier).returning();
+    return supplier;
+  }
+
+  async updateSupplier(id: number, supplierData: Partial<InsertSupplier>): Promise<Supplier | undefined> {
+    const [supplier] = await db.update(suppliers).set(supplierData).where(eq(suppliers.id, id)).returning();
+    return supplier;
+  }
+
+  async deleteSupplier(id: number): Promise<boolean> {
+    await db.delete(suppliers).where(eq(suppliers.id, id));
     return true;
   }
 
