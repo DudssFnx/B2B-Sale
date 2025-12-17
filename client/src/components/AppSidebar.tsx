@@ -36,6 +36,9 @@ import {
   Calendar,
   Palette,
   Wallet,
+  ArrowUpRight,
+  ArrowDownRight,
+  Banknote,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 type UserRole = "admin" | "sales" | "customer";
@@ -65,7 +68,7 @@ const menuItems: Record<UserRole, MenuItem[]> = {
     { title: "Categorias", url: "/categories", icon: Grid3X3 },
     { title: "Catálogo", url: "/catalog", icon: Package },
     { title: "Todos os Pedidos", url: "/orders", icon: ClipboardList },
-    { title: "Fiado", url: "/fiado", icon: Wallet },
+    { title: "Contas a Receber", url: "/contas-receber", icon: ArrowUpRight },
   ],
   admin: [
     { 
@@ -93,7 +96,14 @@ const menuItems: Record<UserRole, MenuItem[]> = {
     { title: "Clientes", url: "/customers", icon: UserCheck },
     { title: "Usuários", url: "/users", icon: Users },
     { title: "Cupons", url: "/coupons", icon: Ticket },
-    { title: "Fiado", url: "/fiado", icon: Wallet },
+    { 
+      title: "Financeiro", 
+      icon: Banknote,
+      subItems: [
+        { title: "Contas a Receber", url: "/contas-receber", icon: ArrowUpRight },
+        { title: "Contas a Pagar", url: "/contas-pagar", icon: ArrowDownRight },
+      ]
+    },
     { title: "Agenda", url: "/agenda", icon: Calendar },
     { title: "Bling", url: "/bling", icon: Link2 },
     { title: "Configurações", url: "/settings", icon: Settings },

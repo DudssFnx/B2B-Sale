@@ -371,3 +371,56 @@ export const insertCreditPaymentSchema = createInsertSchema(creditPayments).omit
 
 export type InsertCreditPayment = z.infer<typeof insertCreditPaymentSchema>;
 export type CreditPayment = typeof creditPayments.$inferSelect;
+
+// Accounts Payable (Contas a Pagar) - Expenses and supplier debts
+// STATUS:
+// - PENDENTE: Pending payment
+// - PAGO: Paid
+// - VENCIDO: Overdue
+// - CANCELADO: Cancelled
+export const accountsPayable = pgTable("accounts_payable", {
+  id: serial("id").primaryKey(),
+  supplierId: varchar("supplier_id").references(() => users.id), // Optional link to supplier
+  supplierName: text("supplier_name"), // Or manual supplier name
+  category: text("category"), // Tipo: fornecedor, aluguel, salario, imposto, etc.
+  description: text("description").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paidAmount: decimal("paid_amount", { precision: 10, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("PENDENTE"), // PENDENTE, PAGO, VENCIDO, CANCELADO
+  dueDate: timestamp("due_date"), // Data de vencimento
+  paidAt: timestamp("paid_at"), // Data do pagamento
+  paymentMethod: text("payment_method"), // PIX, BOLETO, TRANSFERENCIA, etc.
+  documentNumber: text("document_number"), // Número do documento/NF
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAccountPayableSchema = createInsertSchema(accountsPayable).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAccountPayable = z.infer<typeof insertAccountPayableSchema>;
+export type AccountPayable = typeof accountsPayable.$inferSelect;
+
+// Accounts Payable payments - individual payments
+export const payablePayments = pgTable("payable_payments", {
+  id: serial("id").primaryKey(),
+  payableId: integer("payable_id").notNull().references(() => accountsPayable.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method"), // PIX, BOLETO, TRANSFERENCIA, DINHEIRO
+  notes: text("notes"),
+  paidBy: varchar("paid_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertPayablePaymentSchema = createInsertSchema(payablePayments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertPayablePayment = z.infer<typeof insertPayablePaymentSchema>;
+export type PayablePayment = typeof payablePayments.$inferSelect;

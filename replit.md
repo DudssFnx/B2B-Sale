@@ -87,45 +87,62 @@ Users require admin approval before accessing the system (except admins who are 
 - `BLING_ACCESS_TOKEN` - Token de acesso
 - `BLING_REFRESH_TOKEN` - Token para renovar acesso
 
-## Sistema de Fiado (Crédito ao Cliente)
+## Sistema Financeiro
 
-### Funcionalidades
-O sistema de Fiado permite gerenciar crédito concedido a clientes (compras fiadas):
+O sistema financeiro é composto por dois módulos acessíveis através do menu "Financeiro" na sidebar:
 
-1. **Dashboard Fiado** (`/fiado`)
-   - Total "na rua" (crédito pendente)
-   - Total vencido
-   - Total recebido
-   - Clientes com dívida
+### 1. Contas a Receber (Créditos de Clientes)
+Gerencia créditos concedidos a clientes (vendas fiadas):
 
-2. **Gestão de Créditos**
-   - Criar lançamentos de débito (DEBITO) quando cliente compra fiado
-   - Criar lançamentos de crédito (CREDITO) para ajustes
-   - Status automático: PENDENTE → PARCIAL → PAGO
+**Funcionalidades:**
+- Dashboard com métricas: total pendente, vencido, recebido, clientes em débito
+- Lançamentos de DÉBITO (vendas fiadas) e CRÉDITO (ajustes)
+- Status automático: PENDENTE → PARCIAL → PAGO
+- Registro de pagamentos parciais ou totais
+- Histórico de pagamentos por crédito
+- Calendário de vencimentos e atrasados
+- Calculadora de juros simples
 
-3. **Registro de Pagamentos**
-   - Pagamentos parciais ou totais
-   - Histórico de pagamentos por crédito
-   - Métodos: PIX, Dinheiro, Cartão, Boleto, Transferência
-
-4. **Calendário de Vencimentos**
-   - Próximos vencimentos
-   - Pagamentos atrasados
-
-5. **Calculadora de Juros**
-   - Cálculo de juros simples sobre valores em atraso
-
-### Tabelas do Banco
+**Tabelas:**
 - `customer_credits`: Lançamentos de crédito/débito
-- `credit_payments`: Pagamentos realizados
+- `credit_payments`: Pagamentos recebidos
 
-### API Endpoints
-- `GET /api/credits` - Lista todos os créditos
-- `GET /api/credits/dashboard` - Dashboard com métricas
-- `GET /api/credits/user/:userId` - Créditos de um cliente
-- `POST /api/credits` - Criar novo lançamento
-- `POST /api/credits/:id/payments` - Registrar pagamento
-- `GET /api/credits/:id/payments` - Histórico de pagamentos
+**API Endpoints:**
+- `GET /api/credits` - Lista créditos (admin/sales)
+- `GET /api/credits/dashboard` - Dashboard com métricas (admin/sales)
+- `GET /api/credits/user/:userId` - Créditos de um cliente (admin/sales)
+- `POST /api/credits` - Criar lançamento (admin/sales)
+- `PATCH /api/credits/:id` - Atualizar lançamento (admin/sales)
+- `DELETE /api/credits/:id` - Excluir lançamento (admin only)
+- `POST /api/credits/:id/payments` - Registrar pagamento (admin/sales)
+- `GET /api/credits/:id/payments` - Histórico de pagamentos (admin/sales)
 
-### Acesso
-- Apenas usuários com role Admin ou Sales podem acessar
+### 2. Contas a Pagar (Despesas da Empresa)
+Gerencia despesas e dívidas com fornecedores:
+
+**Funcionalidades:**
+- Dashboard com métricas: total de despesas, pendente, pago, vencido
+- Categorização de despesas: fornecedor, aluguel, salário, impostos, etc.
+- Registro de despesas com data de vencimento
+- Status automático: PENDENTE → PAGO
+- Registro de pagamentos parciais ou totais
+- Histórico de pagamentos por despesa
+- Calendário de vencimentos
+
+**Tabelas:**
+- `accounts_payable`: Lançamentos de despesas
+- `payable_payments`: Pagamentos realizados
+
+**API Endpoints (Admin only):**
+- `GET /api/payables` - Lista despesas
+- `GET /api/payables/dashboard` - Dashboard com métricas
+- `GET /api/payables/:id` - Detalhe de despesa
+- `POST /api/payables` - Criar despesa
+- `PATCH /api/payables/:id` - Atualizar despesa
+- `DELETE /api/payables/:id` - Excluir despesa
+- `POST /api/payables/:id/payments` - Registrar pagamento
+- `GET /api/payables/:id/payments` - Histórico de pagamentos
+
+### Controle de Acesso
+- **Contas a Receber**: Admin e Sales podem acessar
+- **Contas a Pagar**: Somente Admin pode acessar

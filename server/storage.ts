@@ -14,7 +14,9 @@ import {
   type CatalogConfig,
   type CustomerCredit, type InsertCustomerCredit,
   type CreditPayment, type InsertCreditPayment,
-  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments
+  type AccountPayable, type InsertAccountPayable,
+  type PayablePayment, type InsertPayablePayment,
+  users, categories, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments, accountsPayable, payablePayments
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
@@ -2676,6 +2678,141 @@ export class DatabaseStorage implements IStorage {
       }
       
       await this.updateCustomerCredit(payment.creditId, {
+        paidAmount: newPaidAmount.toFixed(2),
+        status: newStatus,
+        paidAt: newStatus === 'PAGO' ? new Date() : undefined
+      });
+    }
+    
+    return newPayment;
+  }
+
+  // ========== ACCOUNTS PAYABLE ==========
+  async getAccountsPayable(): Promise<AccountPayable[]> {
+    return db.select().from(accountsPayable).orderBy(desc(accountsPayable.createdAt));
+  }
+
+  async getAccountPayable(id: number): Promise<AccountPayable | undefined> {
+    const [payable] = await db.select().from(accountsPayable).where(eq(accountsPayable.id, id));
+    return payable;
+  }
+
+  async createAccountPayable(payable: InsertAccountPayable): Promise<AccountPayable> {
+    const [newPayable] = await db.insert(accountsPayable).values(payable).returning();
+    return newPayable;
+  }
+
+  async updateAccountPayable(id: number, updates: Partial<AccountPayable>): Promise<AccountPayable | undefined> {
+    const [updated] = await db.update(accountsPayable)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(accountsPayable.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteAccountPayable(id: number): Promise<void> {
+    await db.delete(accountsPayable).where(eq(accountsPayable.id, id));
+  }
+
+  async getPayablesDashboard(): Promise<any> {
+    const allPayables = await db.select().from(accountsPayable);
+    
+    const now = new Date();
+    let totalPayables = 0;
+    let totalPending = 0;
+    let totalPaid = 0;
+    let totalOverdue = 0;
+    let pendingCount = 0;
+    
+    const upcomingPayables: any[] = [];
+    const overduePayables: any[] = [];
+    const categoryTotals = new Map<string, { total: number; pending: number; count: number }>();
+    
+    for (const payable of allPayables) {
+      const amount = parseFloat(payable.amount);
+      const paidAmount = parseFloat(payable.paidAmount);
+      const pending = amount - paidAmount;
+      
+      totalPayables += amount;
+      totalPaid += paidAmount;
+      
+      if (payable.status !== 'PAGO' && payable.status !== 'CANCELADO') {
+        totalPending += pending;
+        pendingCount++;
+        
+        const category = payable.category || 'Outros';
+        const catData = categoryTotals.get(category) || { total: 0, pending: 0, count: 0 };
+        catData.total += amount;
+        catData.pending += pending;
+        catData.count++;
+        categoryTotals.set(category, catData);
+        
+        if (payable.dueDate) {
+          const dueDate = new Date(payable.dueDate);
+          const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+          
+          const payableInfo = {
+            id: payable.id,
+            supplierName: payable.supplierName,
+            category: payable.category,
+            description: payable.description,
+            amount,
+            pendingAmount: pending,
+            dueDate,
+            daysUntilDue,
+            status: payable.status
+          };
+          
+          if (daysUntilDue < 0) {
+            totalOverdue += pending;
+            overduePayables.push(payableInfo);
+          } else if (daysUntilDue <= 30) {
+            upcomingPayables.push(payableInfo);
+          }
+        }
+      }
+    }
+    
+    return {
+      overview: {
+        totalPayables,
+        totalPending,
+        totalPaid,
+        totalOverdue,
+        payablesCount: pendingCount
+      },
+      upcomingPayables: upcomingPayables.sort((a, b) => a.daysUntilDue - b.daysUntilDue),
+      overduePayables: overduePayables.sort((a, b) => a.daysUntilDue - b.daysUntilDue),
+      recentPayments: [],
+      byCategory: Array.from(categoryTotals.entries()).map(([category, data]) => ({
+        category,
+        ...data
+      })).sort((a, b) => b.pending - a.pending)
+    };
+  }
+
+  // ========== PAYABLE PAYMENTS ==========
+  async getPayablePayments(payableId: number): Promise<PayablePayment[]> {
+    return db.select().from(payablePayments)
+      .where(eq(payablePayments.payableId, payableId))
+      .orderBy(desc(payablePayments.createdAt));
+  }
+
+  async createPayablePayment(payment: InsertPayablePayment): Promise<PayablePayment> {
+    const [newPayment] = await db.insert(payablePayments).values(payment).returning();
+    
+    // Update payable's paid amount
+    const payable = await this.getAccountPayable(payment.payableId);
+    if (payable) {
+      const newPaidAmount = parseFloat(payable.paidAmount) + parseFloat(payment.amount);
+      const totalAmount = parseFloat(payable.amount);
+      
+      let newStatus = payable.status;
+      if (newPaidAmount >= totalAmount) {
+        newStatus = 'PAGO';
+      }
+      
+      await this.updateAccountPayable(payment.payableId, {
         paidAmount: newPaidAmount.toFixed(2),
         status: newStatus,
         paidAt: newStatus === 'PAGO' ? new Date() : undefined

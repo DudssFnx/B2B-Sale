@@ -95,7 +95,7 @@ interface CreditsDashboard {
   }>;
 }
 
-export default function FiadoPage() {
+export default function ContasReceberPage() {
   const { isAdmin, isSales } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -178,7 +178,7 @@ export default function FiadoPage() {
               <Wallet className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold">Fiado</h1>
+              <h1 className="text-xl font-semibold">Contas a Receber</h1>
               <p className="text-sm text-muted-foreground">Gerenciamento de credito de clientes</p>
             </div>
           </div>

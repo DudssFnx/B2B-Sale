@@ -5,7 +5,7 @@ import { db } from "./db";
 import { products, orderItems, orders } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { insertCategorySchema, insertProductSchema, insertOrderSchema, insertOrderItemSchema, insertCouponSchema, insertCatalogBannerSchema, insertCatalogSlideSchema } from "@shared/schema";
+import { insertCategorySchema, insertProductSchema, insertOrderSchema, insertOrderItemSchema, insertCouponSchema, insertCatalogBannerSchema, insertCatalogSlideSchema, insertAccountPayableSchema, insertPayablePaymentSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import { Client } from "@replit/object-storage";
@@ -1417,6 +1417,183 @@ export async function registerRoutes(
       res.json(payments);
     } catch (error) {
       console.error("Error fetching payments:", error);
+      res.status(500).json({ message: "Failed to fetch payments" });
+    }
+  });
+
+  // ========== ACCOUNTS PAYABLE (CONTAS A PAGAR) ==========
+  // All endpoints require admin role for full access control
+  
+  // Get all payables
+  app.get('/api/payables', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const payables = await storage.getAccountsPayable();
+      res.json(payables);
+    } catch (error) {
+      console.error("Error fetching payables:", error);
+      res.status(500).json({ message: "Failed to fetch payables" });
+    }
+  });
+
+  // Get payables dashboard
+  app.get('/api/payables/dashboard', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const dashboard = await storage.getPayablesDashboard();
+      res.json(dashboard);
+    } catch (error) {
+      console.error("Error fetching payables dashboard:", error);
+      res.status(500).json({ message: "Failed to fetch payables dashboard" });
+    }
+  });
+
+  // Get single payable
+  app.get('/api/payables/:id', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const payable = await storage.getAccountPayable(parseInt(req.params.id));
+      if (!payable) {
+        return res.status(404).json({ message: "Payable not found" });
+      }
+      res.json(payable);
+    } catch (error) {
+      console.error("Error fetching payable:", error);
+      res.status(500).json({ message: "Failed to fetch payable" });
+    }
+  });
+
+  // Create new payable with validation
+  const createPayableSchema = z.object({
+    supplierName: z.string().optional().nullable(),
+    category: z.string().optional().nullable(),
+    description: z.string().min(1, "Descrição é obrigatória"),
+    amount: z.union([z.string(), z.number()]).transform(v => {
+      const num = typeof v === 'string' ? parseFloat(v) : v;
+      if (isNaN(num) || num <= 0) throw new Error("Valor inválido");
+      return num.toFixed(2);
+    }),
+    dueDate: z.string().optional().nullable().transform(v => v ? new Date(v) : null),
+    documentNumber: z.string().optional().nullable(),
+    notes: z.string().optional().nullable()
+  });
+
+  app.post('/api/payables', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const validation = createPayableSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const data = validation.data;
+      const payable = await storage.createAccountPayable({
+        supplierName: data.supplierName || null,
+        category: data.category || null,
+        description: data.description,
+        amount: data.amount,
+        paidAmount: "0",
+        status: 'PENDENTE',
+        dueDate: data.dueDate,
+        documentNumber: data.documentNumber || null,
+        notes: data.notes || null,
+        createdBy: req.user.id
+      });
+      
+      res.status(201).json(payable);
+    } catch (error) {
+      console.error("Error creating payable:", error);
+      res.status(500).json({ message: "Failed to create payable" });
+    }
+  });
+
+  // Update payable
+  app.patch('/api/payables/:id', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const updates: any = {};
+      if (req.body.description !== undefined) updates.description = req.body.description;
+      if (req.body.supplierName !== undefined) updates.supplierName = req.body.supplierName;
+      if (req.body.category !== undefined) updates.category = req.body.category;
+      if (req.body.status !== undefined) updates.status = req.body.status;
+      if (req.body.notes !== undefined) updates.notes = req.body.notes;
+      if (req.body.dueDate !== undefined) {
+        updates.dueDate = req.body.dueDate ? new Date(req.body.dueDate) : null;
+      }
+      
+      const payable = await storage.updateAccountPayable(parseInt(req.params.id), updates);
+      if (!payable) {
+        return res.status(404).json({ message: "Payable not found" });
+      }
+      res.json(payable);
+    } catch (error) {
+      console.error("Error updating payable:", error);
+      res.status(500).json({ message: "Failed to update payable" });
+    }
+  });
+
+  // Delete payable
+  app.delete('/api/payables/:id', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      await storage.deleteAccountPayable(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting payable:", error);
+      res.status(500).json({ message: "Failed to delete payable" });
+    }
+  });
+
+  // Register payment for payable with validation
+  const createPayablePaymentSchema = z.object({
+    amount: z.union([z.string(), z.number()]).transform(v => {
+      const num = typeof v === 'string' ? parseFloat(v) : v;
+      if (isNaN(num) || num <= 0) throw new Error("Valor inválido");
+      return num.toFixed(2);
+    }),
+    paymentMethod: z.string().optional().nullable(),
+    notes: z.string().optional().nullable()
+  });
+
+  app.post('/api/payables/:id/payments', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const payableId = parseInt(req.params.id);
+      
+      const validation = createPayablePaymentSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ 
+          message: "Dados inválidos", 
+          errors: validation.error.errors 
+        });
+      }
+      
+      const data = validation.data;
+      const payable = await storage.getAccountPayable(payableId);
+      if (!payable) {
+        return res.status(404).json({ message: "Payable not found" });
+      }
+      
+      const payment = await storage.createPayablePayment({
+        payableId,
+        amount: data.amount,
+        paymentMethod: data.paymentMethod || null,
+        notes: data.notes || null,
+        paidBy: req.user.id
+      });
+      
+      const updatedPayable = await storage.getAccountPayable(payableId);
+      
+      res.status(201).json({ payment, payable: updatedPayable });
+    } catch (error) {
+      console.error("Error registering payable payment:", error);
+      res.status(500).json({ message: "Failed to register payment" });
+    }
+  });
+
+  // Get payments for payable
+  app.get('/api/payables/:id/payments', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const payments = await storage.getPayablePayments(parseInt(req.params.id));
+      res.json(payments);
+    } catch (error) {
+      console.error("Error fetching payable payments:", error);
       res.status(500).json({ message: "Failed to fetch payments" });
     }
   });
