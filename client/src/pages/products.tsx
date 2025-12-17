@@ -42,7 +42,8 @@ import {
   Package,
   DollarSign,
   Boxes,
-  Save
+  Save,
+  Ruler
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -63,6 +64,10 @@ interface ProductData {
   image: string | null;
   images: string[] | null;
   featured: boolean;
+  weight: number | null;
+  width: number | null;
+  height: number | null;
+  depth: number | null;
 }
 
 const productSchema = z.object({
@@ -75,6 +80,10 @@ const productSchema = z.object({
   stock: z.coerce.number().int().min(0, "Estoque deve ser 0 ou mais"),
   description: z.string().optional(),
   featured: z.boolean().default(false),
+  weight: z.coerce.number().min(0, "Peso deve ser positivo").optional().or(z.literal("")),
+  width: z.coerce.number().min(0, "Largura deve ser positiva").optional().or(z.literal("")),
+  height: z.coerce.number().min(0, "Altura deve ser positiva").optional().or(z.literal("")),
+  depth: z.coerce.number().min(0, "Profundidade deve ser positiva").optional().or(z.literal("")),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -130,6 +139,10 @@ export default function ProductsPage() {
     image: p.image,
     images: p.images || null,
     featured: p.featured || false,
+    weight: p.weight ? parseFloat(p.weight) : null,
+    width: p.width ? parseFloat(p.width) : null,
+    height: p.height ? parseFloat(p.height) : null,
+    depth: p.depth ? parseFloat(p.depth) : null,
   }));
 
   const form = useForm<ProductFormValues>({
@@ -144,6 +157,10 @@ export default function ProductsPage() {
       stock: 0,
       description: "",
       featured: false,
+      weight: "",
+      width: "",
+      height: "",
+      depth: "",
     },
   });
 
@@ -274,7 +291,7 @@ export default function ProductsPage() {
   };
 
   const openAddForm = () => {
-    form.reset({ name: "", sku: "", categoryId: "", brand: "", price: 0, cost: "", stock: 0, description: "", featured: false });
+    form.reset({ name: "", sku: "", categoryId: "", brand: "", price: 0, cost: "", stock: 0, description: "", featured: false, weight: "", width: "", height: "", depth: "" });
     setEditingProduct(null);
     setImageUrls([]);
     setActiveFormTab("dados");
@@ -292,6 +309,10 @@ export default function ProductsPage() {
       stock: product.stock,
       description: product.description || "",
       featured: product.featured,
+      weight: product.weight ?? "",
+      width: product.width ?? "",
+      height: product.height ?? "",
+      depth: product.depth ?? "",
     });
     setEditingProduct(product);
     const existingImages = product.images || (product.image ? [product.image] : []);
@@ -319,6 +340,10 @@ export default function ProductsPage() {
       stock: product.stock,
       description: product.description || "",
       featured: false,
+      weight: product.weight ?? "",
+      width: product.width ?? "",
+      height: product.height ?? "",
+      depth: product.depth ?? "",
     });
     setEditingProduct(null);
     const existingImages = product.images || (product.image ? [product.image] : []);
@@ -433,6 +458,10 @@ export default function ProductsPage() {
                     <TabsTrigger value="imagens" className="gap-2">
                       <ImageIcon className="h-4 w-4" />
                       Imagens
+                    </TabsTrigger>
+                    <TabsTrigger value="dimensoes" className="gap-2">
+                      <Ruler className="h-4 w-4" />
+                      Dimensoes
                     </TabsTrigger>
                   </TabsList>
 
@@ -731,6 +760,107 @@ export default function ProductsPage() {
                         <p className="text-xs text-muted-foreground">
                           Formatos: JPG, PNG, WebP, GIF. Maximo 5 imagens. A primeira sera a imagem principal.
                         </p>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="dimensoes" className="space-y-4">
+                    <Card>
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-base">Medidas e Peso</CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          Informacoes para calculo de frete e logistica
+                        </p>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="weight"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Peso (kg)</FormLabel>
+                              <FormControl>
+                                <Input 
+                                  {...field} 
+                                  type="number"
+                                  step="0.001"
+                                  min="0"
+                                  placeholder="Ex: 0.500"
+                                  className="max-w-[200px]"
+                                  data-testid="input-product-weight" 
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <Separator />
+
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="width"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Largura (cm)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field} 
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Ex: 20"
+                                    data-testid="input-product-width" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="height"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Altura (cm)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field} 
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Ex: 15"
+                                    data-testid="input-product-height" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="depth"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Profundidade (cm)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    {...field} 
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Ex: 10"
+                                    data-testid="input-product-depth" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
                       </CardContent>
                     </Card>
                   </TabsContent>

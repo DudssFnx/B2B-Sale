@@ -87,6 +87,10 @@ export const products = pgTable("products", {
   image: text("image"),
   images: text("images").array(),
   featured: boolean("featured").notNull().default(false),
+  weight: decimal("weight", { precision: 10, scale: 3 }),
+  width: decimal("width", { precision: 10, scale: 2 }),
+  height: decimal("height", { precision: 10, scale: 2 }),
+  depth: decimal("depth", { precision: 10, scale: 2 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
