@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Database, Link2, Bell, Shield, Palette, Check, UserCheck, ShoppingBag } from "lucide-react";
+import { Database, Link2, Bell, Shield, Palette, Check, UserCheck, ShoppingBag, Store, Percent } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -93,6 +93,14 @@ export default function SettingsPage() {
     queryKey: ['/api/settings/delivery_catalog_mode'],
   });
 
+  const { data: retailModeSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/retail_mode_enabled'],
+  });
+
+  const { data: retailMarkupSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/retail_markup_percentage'],
+  });
+
   const agePopupMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       return apiRequest('POST', '/api/settings/age_verification_popup', { value: enabled ? 'true' : 'false' });
@@ -119,8 +127,37 @@ export default function SettingsPage() {
     },
   });
 
+  const retailModeMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiRequest('POST', '/api/settings/retail_mode_enabled', { value: enabled ? 'true' : 'false' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/retail_mode_enabled'] });
+      toast({ title: "Configuração salva", description: "Modo varejo atualizado." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível salvar a configuração.", variant: "destructive" });
+    },
+  });
+
+  const retailMarkupMutation = useMutation({
+    mutationFn: async (percentage: string) => {
+      return apiRequest('POST', '/api/settings/retail_markup_percentage', { value: percentage });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/retail_markup_percentage'] });
+      toast({ title: "Configuração salva", description: "Porcentagem de markup atualizada." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível salvar a configuração.", variant: "destructive" });
+    },
+  });
+
   const isAgePopupEnabled = agePopupSetting?.value === 'true';
   const isDeliveryModeEnabled = deliveryModeSetting?.value === 'true';
+  const isRetailModeEnabled = retailModeSetting?.value === 'true';
+  const retailMarkupPercentage = retailMarkupSetting?.value || '30';
+  const [markupInput, setMarkupInput] = useState(retailMarkupPercentage);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("sidebarTheme");
@@ -129,6 +166,12 @@ export default function SettingsPage() {
       applyTheme(savedTheme);
     }
   }, []);
+
+  useEffect(() => {
+    if (retailMarkupSetting?.value) {
+      setMarkupInput(retailMarkupSetting.value);
+    }
+  }, [retailMarkupSetting?.value]);
 
   const applyTheme = (themeId: string) => {
     const themeConfig = sidebarThemes.find(t => t.id === themeId);
@@ -312,6 +355,79 @@ export default function SettingsPage() {
                 <li>Botão de adicionar ao carrinho rápido</li>
                 <li>Design otimizado para mobile</li>
                 <li>Visual moderno de app de delivery</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Modo Varejo
+            </CardTitle>
+            <CardDescription>Configure precos de varejo com markup automatico</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Ativar Modo Varejo</Label>
+                <p className="text-sm text-muted-foreground">
+                  Exibe preco de varejo calculado automaticamente
+                </p>
+              </div>
+              <Switch
+                checked={isRetailModeEnabled}
+                onCheckedChange={(checked) => retailModeMutation.mutate(checked)}
+                disabled={retailModeMutation.isPending}
+                data-testid="switch-retail-mode"
+              />
+            </div>
+            
+            {isRetailModeEnabled && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <Label htmlFor="markup-percentage" className="flex items-center gap-2">
+                    <Percent className="h-4 w-4" />
+                    Porcentagem de Markup
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="markup-percentage"
+                      type="number"
+                      min="0"
+                      max="500"
+                      step="1"
+                      value={markupInput}
+                      onChange={(e) => setMarkupInput(e.target.value)}
+                      className="w-24"
+                      data-testid="input-markup-percentage"
+                    />
+                    <span className="flex items-center text-muted-foreground">%</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => retailMarkupMutation.mutate(markupInput)}
+                      disabled={retailMarkupMutation.isPending || markupInput === retailMarkupPercentage}
+                      data-testid="button-save-markup"
+                    >
+                      Salvar
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    O preco de varejo sera calculado como: Preco Atacado + {markupInput}%
+                  </p>
+                </div>
+              </>
+            )}
+            
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-medium">Como funciona:</p>
+              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Clientes atacado veem os dois precos ao clicar no produto</li>
+                <li>O preco de varejo e calculado automaticamente</li>
+                <li>Ideal para lojistas que revendem seus produtos</li>
               </ul>
             </div>
           </CardContent>
