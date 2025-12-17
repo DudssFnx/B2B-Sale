@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Database, Link2, Bell, Shield, Palette, Check, UserCheck } from "lucide-react";
+import { Database, Link2, Bell, Shield, Palette, Check, UserCheck, ShoppingBag } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -89,6 +89,10 @@ export default function SettingsPage() {
     queryKey: ['/api/settings/age_verification_popup'],
   });
 
+  const { data: deliveryModeSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/delivery_catalog_mode'],
+  });
+
   const agePopupMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       return apiRequest('POST', '/api/settings/age_verification_popup', { value: enabled ? 'true' : 'false' });
@@ -102,7 +106,21 @@ export default function SettingsPage() {
     },
   });
 
+  const deliveryModeMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiRequest('POST', '/api/settings/delivery_catalog_mode', { value: enabled ? 'true' : 'false' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/delivery_catalog_mode'] });
+      toast({ title: "Configuração salva", description: "Modo catálogo delivery atualizado." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível salvar a configuração.", variant: "destructive" });
+    },
+  });
+
   const isAgePopupEnabled = agePopupSetting?.value === 'true';
+  const isDeliveryModeEnabled = deliveryModeSetting?.value === 'true';
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("sidebarTheme");
@@ -260,6 +278,42 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Quando ativado, visitantes precisarão confirmar que têm mais de 18 anos para acessar o catálogo.
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5" />
+              Modo Catálogo Delivery
+            </CardTitle>
+            <CardDescription>Transforme seu catálogo em um app de delivery moderno</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Ativar Modo Delivery</Label>
+                <p className="text-sm text-muted-foreground">
+                  Visual inspirado em iFood, Zé Delivery e Rappi
+                </p>
+              </div>
+              <Switch
+                checked={isDeliveryModeEnabled}
+                onCheckedChange={(checked) => deliveryModeMutation.mutate(checked)}
+                disabled={deliveryModeMutation.isPending}
+                data-testid="switch-delivery-mode"
+              />
+            </div>
+            <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+              <p className="text-sm font-medium">Recursos do Modo Delivery:</p>
+              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Cards grandes com fotos em destaque</li>
+                <li>Categorias com scroll horizontal</li>
+                <li>Botão de adicionar ao carrinho rápido</li>
+                <li>Design otimizado para mobile</li>
+                <li>Visual moderno de app de delivery</li>
+              </ul>
+            </div>
           </CardContent>
         </Card>
 
