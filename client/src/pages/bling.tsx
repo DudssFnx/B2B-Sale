@@ -559,32 +559,86 @@ export default function BlingPage() {
                 </div>
 
                 {blingCategories.length > 0 && (
-                  <ScrollArea className="h-64 border rounded-md p-3">
-                    <div className="space-y-2">
-                      {blingCategories.map((category) => (
-                        <label
-                          key={category.id}
-                          className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
-                          data-testid={`category-item-${category.id}`}
-                        >
-                          <Checkbox
-                            checked={selectedCategories.includes(category.id)}
-                            onCheckedChange={() => toggleCategorySelection(category.id)}
-                            data-testid={`checkbox-category-${category.id}`}
-                          />
-                          <div className="flex-1">
-                            <span className="text-sm font-medium">{category.descricao}</span>
-                            {category.categoriaPai && (
+                  <ScrollArea className="h-80 border rounded-md p-3">
+                    <div className="space-y-1">
+                      {/* Show parent categories first, then their subcategories */}
+                      {blingCategories
+                        .filter(cat => !cat.categoriaPai)
+                        .map((parentCat) => {
+                          const subcategories = blingCategories.filter(
+                            sub => sub.categoriaPai?.id === parentCat.id
+                          );
+                          return (
+                            <div key={parentCat.id} className="space-y-1">
+                              <label
+                                className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer bg-muted/30"
+                                data-testid={`category-item-${parentCat.id}`}
+                              >
+                                <Checkbox
+                                  checked={selectedCategories.includes(parentCat.id)}
+                                  onCheckedChange={() => toggleCategorySelection(parentCat.id)}
+                                  data-testid={`checkbox-category-${parentCat.id}`}
+                                />
+                                <div className="flex-1">
+                                  <span className="text-sm font-semibold">{parentCat.descricao}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    (Categoria)
+                                  </span>
+                                </div>
+                                <Badge variant="outline" className="text-xs">
+                                  ID: {parentCat.id}
+                                </Badge>
+                              </label>
+                              {subcategories.map((subCat) => (
+                                <label
+                                  key={subCat.id}
+                                  className="flex items-center gap-3 p-2 pl-8 rounded-md hover-elevate cursor-pointer"
+                                  data-testid={`category-item-${subCat.id}`}
+                                >
+                                  <Checkbox
+                                    checked={selectedCategories.includes(subCat.id)}
+                                    onCheckedChange={() => toggleCategorySelection(subCat.id)}
+                                    data-testid={`checkbox-category-${subCat.id}`}
+                                  />
+                                  <div className="flex-1">
+                                    <span className="text-sm">{subCat.descricao}</span>
+                                    <span className="text-xs text-muted-foreground ml-2">
+                                      (Subcategoria)
+                                    </span>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">
+                                    ID: {subCat.id}
+                                  </Badge>
+                                </label>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      {/* Show orphan subcategories (parent not in list) */}
+                      {blingCategories
+                        .filter(cat => cat.categoriaPai && !blingCategories.find(p => p.id === cat.categoriaPai?.id))
+                        .map((orphanCat) => (
+                          <label
+                            key={orphanCat.id}
+                            className="flex items-center gap-3 p-2 rounded-md hover-elevate cursor-pointer"
+                            data-testid={`category-item-${orphanCat.id}`}
+                          >
+                            <Checkbox
+                              checked={selectedCategories.includes(orphanCat.id)}
+                              onCheckedChange={() => toggleCategorySelection(orphanCat.id)}
+                              data-testid={`checkbox-category-${orphanCat.id}`}
+                            />
+                            <div className="flex-1">
+                              <span className="text-sm">{orphanCat.descricao}</span>
                               <span className="text-xs text-muted-foreground ml-2">
-                                (Subcategoria)
+                                (Subcategoria órfã)
                               </span>
-                            )}
-                          </div>
-                          <Badge variant="outline" className="text-xs">
-                            ID: {category.id}
-                          </Badge>
-                        </label>
-                      ))}
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              ID: {orphanCat.id}
+                            </Badge>
+                          </label>
+                        ))}
                     </div>
                   </ScrollArea>
                 )}
