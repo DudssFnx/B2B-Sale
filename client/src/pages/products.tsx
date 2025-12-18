@@ -23,6 +23,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Switch } from "@/components/ui/switch";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,7 +58,9 @@ import {
   Save,
   Ruler,
   FileText,
-  Barcode
+  Barcode,
+  Check,
+  ChevronsUpDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -111,6 +126,8 @@ export default function ProductsPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [activeFormTab, setActiveFormTab] = useState("dados");
+  const [brandPopoverOpen, setBrandPopoverOpen] = useState(false);
+  const [brandSearch, setBrandSearch] = useState("");
   const MAX_IMAGES = 5;
 
   const { data: productsResponse, isLoading } = useQuery<{ products: SchemaProduct[]; total: number }>({
@@ -134,6 +151,15 @@ export default function ProductsPage() {
   });
   
   const categoriesData = categoriesResponse?.categories || [];
+
+  const { data: brandsData = [] } = useQuery<string[]>({
+    queryKey: ['/api/brands'],
+    queryFn: async () => {
+      const res = await fetch('/api/brands', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch brands');
+      return res.json();
+    },
+  });
 
   const categoryMap: Record<number, string> = {};
   categoriesData.forEach(cat => {
@@ -261,6 +287,7 @@ export default function ProductsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/brands'] });
     },
   });
 
@@ -296,6 +323,7 @@ export default function ProductsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/brands'] });
     },
   });
 
@@ -585,15 +613,101 @@ export default function ProductsPage() {
                             control={form.control}
                             name="brand"
                             render={({ field }) => (
-                              <FormItem>
+                              <FormItem className="flex flex-col">
                                 <FormLabel>Marca</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    {...field} 
-                                    placeholder="Ex: Nike"
-                                    data-testid="input-product-brand" 
-                                  />
-                                </FormControl>
+                                <Popover open={brandPopoverOpen} onOpenChange={setBrandPopoverOpen}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button
+                                        variant="outline"
+                                        role="combobox"
+                                        aria-expanded={brandPopoverOpen}
+                                        className="justify-between font-normal"
+                                        data-testid="input-product-brand"
+                                      >
+                                        {field.value || "Selecione ou crie uma marca"}
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[300px] p-0" align="start">
+                                    <Command>
+                                      <CommandInput 
+                                        placeholder="Buscar ou criar marca..." 
+                                        value={brandSearch}
+                                        onValueChange={setBrandSearch}
+                                      />
+                                      <CommandList>
+                                        <CommandEmpty>
+                                          {brandSearch.trim() && (
+                                            <div 
+                                              className="cursor-pointer p-2 hover-elevate rounded-md mx-1"
+                                              onClick={() => {
+                                                field.onChange(brandSearch.trim());
+                                                setBrandSearch("");
+                                                setBrandPopoverOpen(false);
+                                              }}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <Plus className="h-4 w-4" />
+                                                <span>Criar marca "{brandSearch.trim()}"</span>
+                                              </div>
+                                            </div>
+                                          )}
+                                        </CommandEmpty>
+                                        <CommandGroup>
+                                          {brandsData
+                                            .filter(brand => 
+                                              brand.toLowerCase().includes(brandSearch.toLowerCase())
+                                            )
+                                            .map((brand) => (
+                                              <CommandItem
+                                                key={brand}
+                                                value={brand}
+                                                onSelect={() => {
+                                                  field.onChange(brand);
+                                                  setBrandSearch("");
+                                                  setBrandPopoverOpen(false);
+                                                }}
+                                              >
+                                                <Check
+                                                  className={`mr-2 h-4 w-4 ${
+                                                    field.value === brand ? "opacity-100" : "opacity-0"
+                                                  }`}
+                                                />
+                                                {brand}
+                                              </CommandItem>
+                                            ))}
+                                          {brandSearch.trim() && !brandsData.some(b => b.toLowerCase() === brandSearch.trim().toLowerCase()) && (
+                                            <CommandItem
+                                              value={`create-${brandSearch}`}
+                                              onSelect={() => {
+                                                field.onChange(brandSearch.trim());
+                                                setBrandSearch("");
+                                                setBrandPopoverOpen(false);
+                                              }}
+                                            >
+                                              <Plus className="mr-2 h-4 w-4" />
+                                              Criar "{brandSearch.trim()}"
+                                            </CommandItem>
+                                          )}
+                                        </CommandGroup>
+                                      </CommandList>
+                                    </Command>
+                                  </PopoverContent>
+                                </Popover>
+                                {field.value && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-fit h-6 px-2 text-xs text-muted-foreground"
+                                    onClick={() => field.onChange("")}
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Limpar marca
+                                  </Button>
+                                )}
                                 <FormMessage />
                               </FormItem>
                             )}
