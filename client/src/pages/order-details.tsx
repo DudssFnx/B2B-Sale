@@ -189,11 +189,21 @@ export default function OrderDetailsPage() {
       });
     },
     onError: (err: Error) => {
-      const desc = isAdmin 
-        ? (err.message || "Não foi possível reservar o estoque. Verifique se há estoque disponível.")
-        : "Não foi possível reservar o estoque. Contate o administrador.";
+      let desc = "Não foi possível reservar o estoque. Verifique se há estoque disponível.";
+      const errorMsg = err.message || "";
+      const match = errorMsg.match(/\d+:\s*(.+)/);
+      if (match) {
+        try {
+          const parsed = JSON.parse(match[1]);
+          if (parsed.message) {
+            desc = parsed.message;
+          }
+        } catch {
+          desc = match[1];
+        }
+      }
       toast({
-        title: "Erro",
+        title: "Estoque Insuficiente",
         description: desc,
         variant: "destructive",
       });

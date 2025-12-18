@@ -420,6 +420,7 @@ export default function OrdersPage() {
     const orderIds = Array.from(selectedOrders);
     let successCount = 0;
     let errorCount = 0;
+    const errorMessages: string[] = [];
 
     for (const orderId of orderIds) {
       try {
@@ -431,8 +432,22 @@ export default function OrdersPage() {
           await apiRequest("PATCH", `/api/orders/${orderId}`, { status: newStatus });
         }
         successCount++;
-      } catch (e) {
+      } catch (e: any) {
         errorCount++;
+        const errorMsg = e.message || "Erro desconhecido";
+        const match = errorMsg.match(/\d+:\s*(.+)/);
+        if (match) {
+          try {
+            const parsed = JSON.parse(match[1]);
+            if (parsed.message) {
+              errorMessages.push(parsed.message);
+            }
+          } catch {
+            errorMessages.push(match[1]);
+          }
+        } else {
+          errorMessages.push(errorMsg);
+        }
       }
     }
 
@@ -444,10 +459,11 @@ export default function OrdersPage() {
     if (errorCount === 0) {
       toast({ title: "Sucesso", description: `${successCount} pedido(s) atualizado(s) com sucesso` });
     } else {
+      const uniqueErrors = [...new Set(errorMessages)].slice(0, 3);
       toast({ 
-        title: "Aviso", 
-        description: `${successCount} atualizado(s), ${errorCount} erro(s)`,
-        variant: errorCount > 0 && successCount === 0 ? "destructive" : "default"
+        title: "Erro ao gerar pedido", 
+        description: uniqueErrors.join(" | ") || `${errorCount} pedido(s) com erro`,
+        variant: "destructive"
       });
     }
   };
