@@ -143,9 +143,12 @@ export default function OrderDetailsPage() {
       });
     },
     onError: (error: Error) => {
+      const desc = isAdmin 
+        ? (error.message || "Não foi possível atualizar o pedido.")
+        : "Não foi possível atualizar o pedido. Contate o administrador.";
       toast({
         title: "Erro",
-        description: error.message || "Não foi possível atualizar o pedido.",
+        description: desc,
         variant: "destructive",
       });
     },
@@ -186,9 +189,12 @@ export default function OrderDetailsPage() {
       });
     },
     onError: (err: Error) => {
+      const desc = isAdmin 
+        ? (err.message || "Não foi possível reservar o estoque. Verifique se há estoque disponível.")
+        : "Não foi possível reservar o estoque. Contate o administrador.";
       toast({
         title: "Erro",
-        description: err.message || "Não foi possível reservar o estoque. Verifique se há estoque disponível.",
+        description: desc,
         variant: "destructive",
       });
     },
@@ -208,9 +214,12 @@ export default function OrderDetailsPage() {
       });
     },
     onError: (err: Error) => {
+      const desc = isAdmin 
+        ? (err.message || "Não foi possível faturar o pedido.")
+        : "Não foi possível faturar o pedido. Contate o administrador.";
       toast({
         title: "Erro",
-        description: err.message || "Não foi possível faturar o pedido.",
+        description: desc,
         variant: "destructive",
       });
     },
@@ -262,9 +271,12 @@ export default function OrderDetailsPage() {
       });
     },
     onError: (err: Error) => {
+      const desc = isAdmin 
+        ? (err.message || "Não foi possível retornar o pedido.")
+        : "Não foi possível retornar o pedido. Contate o administrador.";
       toast({
         title: "Erro",
-        description: err.message || "Não foi possível retornar o pedido.",
+        description: desc,
         variant: "destructive",
       });
     },

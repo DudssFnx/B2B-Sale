@@ -63,6 +63,7 @@ import {
   ChevronsUpDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Product as SchemaProduct, Category } from "@shared/schema";
@@ -120,6 +121,7 @@ type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function ProductsPage() {
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "form">("list");
   const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
@@ -141,7 +143,7 @@ export default function ProductsPage() {
   
   const productsData = productsResponse?.products || [];
 
-  const { data: categoriesResponse } = useQuery<{ categories: Category[]; total: number }>({
+  const { data: categoriesData = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
     queryFn: async () => {
       const res = await fetch('/api/categories?limit=1000', { credentials: 'include' });
@@ -149,8 +151,6 @@ export default function ProductsPage() {
       return res.json();
     },
   });
-  
-  const categoriesData = categoriesResponse?.categories || [];
 
   const { data: brandsData = [] } = useQuery<string[]>({
     queryKey: ['/api/brands'],
@@ -353,8 +353,9 @@ export default function ProductsPage() {
           description: product.name,
         });
       },
-      onError: () => {
-        toast({ title: "Erro", description: "Falha ao alterar destaque", variant: "destructive" });
+      onError: (error: Error) => {
+        const desc = isAdmin ? `Falha ao alterar destaque: ${error.message}` : "Falha ao alterar destaque";
+        toast({ title: "Erro", description: desc, variant: "destructive" });
       },
     });
   };
@@ -458,8 +459,9 @@ export default function ProductsPage() {
             toast({ title: "Produto atualizado", description: values.name });
             setViewMode("list");
           },
-          onError: () => {
-            toast({ title: "Erro", description: "Falha ao atualizar produto", variant: "destructive" });
+          onError: (error: Error) => {
+            const desc = isAdmin ? `Falha ao atualizar produto: ${error.message}` : "Falha ao atualizar produto";
+            toast({ title: "Erro", description: desc, variant: "destructive" });
           },
         }
       );
@@ -469,8 +471,9 @@ export default function ProductsPage() {
           toast({ title: "Produto criado", description: values.name });
           setViewMode("list");
         },
-        onError: () => {
-          toast({ title: "Erro", description: "Falha ao criar produto", variant: "destructive" });
+        onError: (error: Error) => {
+          const desc = isAdmin ? `Falha ao criar produto: ${error.message}` : "Falha ao criar produto";
+          toast({ title: "Erro", description: desc, variant: "destructive" });
         },
       });
     }
@@ -482,8 +485,9 @@ export default function ProductsPage() {
       onSuccess: () => {
         toast({ title: "Produto excluido", description: product.name });
       },
-      onError: () => {
-        toast({ title: "Erro", description: "Falha ao excluir produto", variant: "destructive" });
+      onError: (error: Error) => {
+        const desc = isAdmin ? `Falha ao excluir produto: ${error.message}` : "Falha ao excluir produto";
+        toast({ title: "Erro", description: desc, variant: "destructive" });
       },
     });
   };
