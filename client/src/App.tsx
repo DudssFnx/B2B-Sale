@@ -79,7 +79,7 @@ function AuthenticatedApp() {
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
       <div className="flex h-screen w-full">
         <AppSidebar
-          userRole={(user?.role as "admin" | "sales" | "customer") || "customer"}
+          userRole={(user?.role as "admin" | "sales" | "customer" | "supplier") || "customer"}
           userName={displayName}
           onLogout={logout}
         />

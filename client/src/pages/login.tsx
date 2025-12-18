@@ -43,7 +43,7 @@ export default function LoginPage() {
       const response = await apiRequest("POST", "/api/auth/login", data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data: { user: { role: string } }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       
       // Handle redirect after login (e.g., from checkout flow)
@@ -54,6 +54,8 @@ export default function LoginPage() {
       if (redirectTo) {
         const redirectUrl = step ? `${redirectTo}?step=${step}` : redirectTo;
         setLocation(redirectUrl);
+      } else if (data.user?.role === "supplier") {
+        setLocation("/brand-analytics");
       } else {
         setLocation("/");
       }
