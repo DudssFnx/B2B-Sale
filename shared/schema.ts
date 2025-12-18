@@ -23,7 +23,8 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   profileImageUrl: text("profile_image_url"),
-  role: text("role").notNull().default("customer"), // admin, sales, customer
+  role: text("role").notNull().default("customer"), // admin, sales, customer, supplier
+  allowedBrands: text("allowed_brands").array(),
   customerType: text("customer_type").notNull().default("varejo"), // atacado, varejo
   company: text("company"),
   approved: boolean("approved").notNull().default(false),

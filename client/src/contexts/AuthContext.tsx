@@ -10,6 +10,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isSales: boolean;
   isCustomer: boolean;
+  isSupplier: boolean;
   isApproved: boolean;
 }
 
@@ -30,6 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = user?.role === "admin";
   const isSales = user?.role === "sales";
   const isCustomer = user?.role === "customer";
+  const isSupplier = user?.role === "supplier";
   const isApproved = user?.approved || isAdmin;
 
   return (
@@ -42,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isSales,
         isCustomer,
+        isSupplier,
         isApproved,
       }}
     >
