@@ -343,55 +343,76 @@ interface BlingStockResponse {
   }>;
 }
 
+interface BlingProductStockResponse {
+  id: number;
+  saldoFisicoTotal: number;
+  saldoVirtualTotal: number;
+  depositos?: Array<{
+    id: number;
+    nome: string;
+    saldoFisico: number;
+    saldoVirtual: number;
+  }>;
+}
+
 export async function fetchBlingStock(productIds: number[]): Promise<Map<number, number>> {
   const stockMap = new Map<number, number>();
   
-  console.log(`[fetchBlingStock] Starting stock fetch for ${productIds.length} products`);
+  console.log(`[fetchBlingStock] Starting stock fetch for ${productIds.length} products (individual mode)`);
   
-  const batchSize = 50;
-  for (let i = 0; i < productIds.length; i += batchSize) {
-    const batch = productIds.slice(i, i + batchSize);
-    const idsParam = batch.join(',');
-    
+  let processed = 0;
+  let withStock = 0;
+  
+  for (const productId of productIds) {
     try {
-      const response = await blingApiRequest<{ data: BlingStockResponse[] }>(
-        `/estoques?idsProdutos=${idsParam}`
+      const response = await blingApiRequest<{ data: BlingProductStockResponse }>(
+        `/estoques/produtos/${productId}`
       );
       
-      console.log(`[fetchBlingStock] Batch ${i}: received ${response.data?.length || 0} items`);
-      
       if (response.data) {
-        for (const item of response.data) {
-          let totalStock = item.estoqueAtual || 0;
-          if (item.depositos && item.depositos.length > 0) {
-            totalStock = item.depositos.reduce((sum, d) => sum + (d.saldoVirtual || d.saldo || 0), 0);
-          }
-          stockMap.set(item.id, Math.floor(totalStock));
-          
-          // Log first 3 items of each batch for debugging
-          if (stockMap.size <= 3 || (i === 0 && stockMap.size <= 5)) {
-            console.log(`[fetchBlingStock] Product ${item.id} (${item.codigo}): estoqueAtual=${item.estoqueAtual}, depositos=`, JSON.stringify(item.depositos?.slice(0, 2)));
+        const item = response.data;
+        let totalStock = item.saldoVirtualTotal || item.saldoFisicoTotal || 0;
+        
+        // If depositos exist, sum them up
+        if (item.depositos && item.depositos.length > 0) {
+          totalStock = item.depositos.reduce((sum, d) => sum + (d.saldoVirtual || d.saldoFisico || 0), 0);
+        }
+        
+        stockMap.set(productId, Math.floor(totalStock));
+        
+        if (totalStock > 0) {
+          withStock++;
+          if (withStock <= 5) {
+            console.log(`[fetchBlingStock] Product ${productId}: stock=${totalStock}, depositos=`, JSON.stringify(item.depositos?.slice(0, 2)));
           }
         }
       }
       
-      await new Promise(resolve => setTimeout(resolve, 500));
+      processed++;
+      
+      // Rate limiting - 100ms between requests
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Log progress every 50 products
+      if (processed % 50 === 0) {
+        console.log(`[fetchBlingStock] Progress: ${processed}/${productIds.length} products processed, ${withStock} with stock > 0`);
+      }
+      
     } catch (error) {
       const errorStr = String(error);
       if (errorStr.includes("404") || errorStr.includes("RESOURCE_NOT_FOUND")) {
-        console.log(`[fetchBlingStock] Batch ${i}: No stock data found (products may not have deposits configured)`);
+        // Product has no stock configured - this is normal, set to 0
+        stockMap.set(productId, 0);
       } else if (errorStr.includes("429")) {
-        console.log("[fetchBlingStock] Rate limit hit on stock, waiting 30 seconds...");
+        console.log("[fetchBlingStock] Rate limit hit, waiting 30 seconds...");
         await new Promise(resolve => setTimeout(resolve, 30000));
       } else {
-        console.error(`[fetchBlingStock] Failed to fetch stock for batch starting at ${i}:`, error);
+        console.error(`[fetchBlingStock] Failed to fetch stock for product ${productId}:`, error);
       }
     }
   }
   
-  console.log(`[fetchBlingStock] Finished. Total products with stock data: ${stockMap.size}`);
-  const nonZeroStock = Array.from(stockMap.values()).filter(v => v > 0).length;
-  console.log(`[fetchBlingStock] Products with stock > 0: ${nonZeroStock}`);
+  console.log(`[fetchBlingStock] Finished. Total: ${processed}, with stock data: ${stockMap.size}, with stock > 0: ${withStock}`);
   
   return stockMap;
 }
