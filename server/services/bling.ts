@@ -697,9 +697,19 @@ export async function syncProducts(): Promise<{ created: number; updated: number
     );
     console.log(`Fetched all product details.`);
 
+    // Fetch stock from dedicated stock endpoint (more reliable than product details)
+    updateProgress({
+      phase: 'Buscando estoque',
+      currentStep: totalProducts,
+      message: 'Buscando estoque dos produtos...',
+    });
+    
+    console.log(`Fetching stock for ${productIds.length} products...`);
+    const stockMap = await fetchBlingStock(productIds);
+    console.log(`Fetched stock for ${stockMap.size} products.`);
+
     updateProgress({
       phase: 'Salvando produtos',
-      currentStep: totalProducts,
       message: 'Salvando produtos no banco de dados...',
     });
 
@@ -743,10 +753,11 @@ export async function syncProducts(): Promise<{ created: number; updated: number
         }
 
         const description = blingProduct.descricaoComplementar || blingProduct.descricaoCurta || null;
-        const stock = blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
+        // Get stock from dedicated stock endpoint (stockMap) - more reliable
+        const stock = stockMap.get(productId) ?? blingProduct.estoque?.saldoVirtual ?? blingProduct.estoque?.saldoFisico ?? 0;
         
         if (i < 5) {
-          console.log(`Product ${blingProduct.codigo}: image=${imageUrl ? 'YES' : 'NO'}, stock=${stock}, category=${categoryId}, estoque data:`, blingProduct.estoque);
+          console.log(`Product ${blingProduct.codigo}: image=${imageUrl ? 'YES' : 'NO'}, stock=${stock} (from stockMap: ${stockMap.has(productId)}), category=${categoryId}`);
         }
 
         const productData: InsertProduct = {
