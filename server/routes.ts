@@ -1089,6 +1089,60 @@ export async function registerRoutes(
     }
   });
 
+  // Brand Analytics - for admin/sales and supplier users
+  app.get('/api/admin/brand-analytics', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Admin and sales can see all brands
+      if (user.role === 'admin' || user.role === 'sales') {
+        const brandsFilter = req.query.brands ? (req.query.brands as string).split(',') : undefined;
+        const analytics = await storage.getBrandAnalytics(brandsFilter);
+        return res.json(analytics);
+      }
+
+      // Supplier can only see their allowed brands
+      if (user.role === 'supplier') {
+        const allowedBrands = user.allowedBrands || [];
+        if (allowedBrands.length === 0) {
+          return res.json({
+            brands: [],
+            productsByBrand: {},
+            overview: { totalBrands: 0, totalProducts: 0, totalLowStock: 0, totalOutOfStock: 0, topSellingBrand: null, topSellingBrandRevenue: 0 }
+          });
+        }
+        const analytics = await storage.getBrandAnalytics(allowedBrands);
+        return res.json(analytics);
+      }
+
+      return res.status(403).json({ message: "Access denied" });
+    } catch (error) {
+      console.error("Error fetching brand analytics:", error);
+      res.status(500).json({ message: "Failed to fetch brand analytics" });
+    }
+  });
+
+  // Get all unique brands (for filter selection)
+  app.get('/api/brands', isAuthenticated, async (req: any, res) => {
+    try {
+      const allProducts = await storage.getProducts();
+      const brandsSet = new Set<string>();
+      allProducts.forEach(p => {
+        if (p.brand) brandsSet.add(p.brand);
+      });
+      const brands = Array.from(brandsSet).sort();
+      res.json(brands);
+    } catch (error) {
+      console.error("Error fetching brands:", error);
+      res.status(500).json({ message: "Failed to fetch brands" });
+    }
+  });
+
   // ========== USERS (Admin Only) ==========
   app.get('/api/users', isAuthenticated, isAdmin, async (req, res) => {
     try {

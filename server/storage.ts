@@ -121,6 +121,9 @@ export interface IStorage {
   // Purchases Analytics (for purchasing/restocking decisions)
   getPurchasesAnalytics(): Promise<PurchasesAnalyticsData>;
 
+  // Brand Analytics (for supplier dashboard)
+  getBrandAnalytics(allowedBrands?: string[]): Promise<BrandAnalyticsData>;
+
   // Employee Analytics
   getEmployeeAnalytics(): Promise<EmployeeAnalyticsData>;
 
@@ -446,6 +449,47 @@ export interface PurchasesAnalyticsData {
   slowMoving: SlowMovingProduct[];
   fastMoving: FastMovingProduct[];
   suggestions: PurchaseSuggestion[];
+}
+
+// Brand Analytics Types (for supplier dashboard)
+export interface BrandSummary {
+  brand: string;
+  totalProducts: number;
+  totalStock: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  totalSales30d: number;
+  totalRevenue30d: number;
+  avgTurnover: number;
+}
+
+export interface BrandProductDetail {
+  productId: number;
+  name: string;
+  sku: string;
+  brand: string;
+  stock: number;
+  sales30d: number;
+  sales60d: number;
+  sales90d: number;
+  revenue30d: number;
+  lastSaleDate: Date | null;
+  turnoverDays: number | null;
+  status: 'critical' | 'low' | 'ok' | 'overstock';
+  suggestedPurchase: number;
+}
+
+export interface BrandAnalyticsData {
+  brands: BrandSummary[];
+  productsByBrand: Record<string, BrandProductDetail[]>;
+  overview: {
+    totalBrands: number;
+    totalProducts: number;
+    totalLowStock: number;
+    totalOutOfStock: number;
+    topSellingBrand: string | null;
+    topSellingBrandRevenue: number;
+  };
 }
 
 // Employee Analytics Types
@@ -2252,6 +2296,205 @@ export class DatabaseStorage implements IStorage {
       slowMoving: slowMoving.slice(0, 50),
       fastMoving: fastMoving.slice(0, 50),
       suggestions: suggestions.slice(0, 30),
+    };
+  }
+
+  async getBrandAnalytics(allowedBrands?: string[]): Promise<BrandAnalyticsData> {
+    const now = new Date();
+    const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const days60Ago = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const days90Ago = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+
+    let allProducts = await db.select().from(products);
+    
+    // Filter by allowed brands if specified
+    if (allowedBrands && allowedBrands.length > 0) {
+      allProducts = allProducts.filter(p => p.brand && allowedBrands.includes(p.brand));
+    }
+
+    const faturadoOrders = await db.select().from(orders).where(eq(orders.status, 'FATURADO'));
+    const faturadoOrderIds = new Set(faturadoOrders.map(o => o.id));
+    const allOrderItems = (await db.select().from(orderItems)).filter(item => faturadoOrderIds.has(item.orderId));
+
+    const orderDateMap = new Map<number, Date>();
+    for (const order of faturadoOrders) {
+      orderDateMap.set(order.id, new Date(order.createdAt));
+    }
+
+    // Build sales data per product
+    const salesDataMap = new Map<number, {
+      sales30d: number;
+      sales60d: number;
+      sales90d: number;
+      revenue30d: number;
+      lastSaleDate: Date | null;
+      salesDates: Date[];
+    }>();
+
+    for (const item of allOrderItems) {
+      const orderDate = orderDateMap.get(item.orderId);
+      if (!orderDate) continue;
+
+      const existing = salesDataMap.get(item.productId) || {
+        sales30d: 0,
+        sales60d: 0,
+        sales90d: 0,
+        revenue30d: 0,
+        lastSaleDate: null,
+        salesDates: [],
+      };
+
+      const itemPrice = parseFloat(item.price) * item.quantity;
+
+      if (orderDate >= days30Ago) {
+        existing.sales30d += item.quantity;
+        existing.revenue30d += itemPrice;
+      }
+      if (orderDate >= days60Ago) {
+        existing.sales60d += item.quantity;
+      }
+      if (orderDate >= days90Ago) {
+        existing.sales90d += item.quantity;
+      }
+
+      existing.salesDates.push(orderDate);
+      if (!existing.lastSaleDate || orderDate > existing.lastSaleDate) {
+        existing.lastSaleDate = orderDate;
+      }
+
+      salesDataMap.set(item.productId, existing);
+    }
+
+    // Build brand summaries
+    const brandMap = new Map<string, {
+      totalProducts: number;
+      totalStock: number;
+      lowStockCount: number;
+      outOfStockCount: number;
+      totalSales30d: number;
+      totalRevenue30d: number;
+      turnoverDays: number[];
+    }>();
+
+    const productsByBrand: Record<string, BrandProductDetail[]> = {};
+
+    for (const product of allProducts) {
+      const brand = product.brand || 'Sem Marca';
+      const salesData = salesDataMap.get(product.id);
+      const availableStock = product.stock - (product.reservedStock || 0);
+
+      // Calculate turnover days
+      const avgDailySales = (salesData?.sales30d || 0) / 30;
+      const turnoverDays = avgDailySales > 0 ? Math.round(availableStock / avgDailySales) : null;
+
+      // Determine stock status
+      let status: 'critical' | 'low' | 'ok' | 'overstock' = 'ok';
+      if (availableStock <= 0) {
+        status = 'critical';
+      } else if (turnoverDays !== null && turnoverDays <= 7) {
+        status = 'critical';
+      } else if (turnoverDays !== null && turnoverDays <= 14) {
+        status = 'low';
+      } else if (turnoverDays !== null && turnoverDays > 90) {
+        status = 'overstock';
+      }
+
+      // Calculate suggested purchase quantity
+      const suggestedPurchase = avgDailySales > 0 
+        ? Math.max(0, Math.ceil(avgDailySales * 30) - availableStock) 
+        : 0;
+
+      // Add product detail
+      if (!productsByBrand[brand]) {
+        productsByBrand[brand] = [];
+      }
+      productsByBrand[brand].push({
+        productId: product.id,
+        name: product.name,
+        sku: product.sku,
+        brand,
+        stock: product.stock,
+        sales30d: salesData?.sales30d || 0,
+        sales60d: salesData?.sales60d || 0,
+        sales90d: salesData?.sales90d || 0,
+        revenue30d: salesData?.revenue30d || 0,
+        lastSaleDate: salesData?.lastSaleDate || null,
+        turnoverDays,
+        status,
+        suggestedPurchase,
+      });
+
+      // Update brand summary
+      const brandData = brandMap.get(brand) || {
+        totalProducts: 0,
+        totalStock: 0,
+        lowStockCount: 0,
+        outOfStockCount: 0,
+        totalSales30d: 0,
+        totalRevenue30d: 0,
+        turnoverDays: [],
+      };
+
+      brandData.totalProducts++;
+      brandData.totalStock += product.stock;
+      if (status === 'critical' || status === 'low') brandData.lowStockCount++;
+      if (availableStock <= 0) brandData.outOfStockCount++;
+      brandData.totalSales30d += salesData?.sales30d || 0;
+      brandData.totalRevenue30d += salesData?.revenue30d || 0;
+      if (turnoverDays !== null) brandData.turnoverDays.push(turnoverDays);
+
+      brandMap.set(brand, brandData);
+    }
+
+    // Create brand summaries array
+    const brands: BrandSummary[] = [];
+    let topSellingBrand: string | null = null;
+    let topSellingBrandRevenue = 0;
+
+    for (const [brand, data] of brandMap.entries()) {
+      const avgTurnover = data.turnoverDays.length > 0
+        ? data.turnoverDays.reduce((a, b) => a + b, 0) / data.turnoverDays.length
+        : 0;
+
+      brands.push({
+        brand,
+        totalProducts: data.totalProducts,
+        totalStock: data.totalStock,
+        lowStockCount: data.lowStockCount,
+        outOfStockCount: data.outOfStockCount,
+        totalSales30d: data.totalSales30d,
+        totalRevenue30d: Math.round(data.totalRevenue30d * 100) / 100,
+        avgTurnover: Math.round(avgTurnover),
+      });
+
+      if (data.totalRevenue30d > topSellingBrandRevenue) {
+        topSellingBrandRevenue = data.totalRevenue30d;
+        topSellingBrand = brand;
+      }
+    }
+
+    // Sort brands by revenue
+    brands.sort((a, b) => b.totalRevenue30d - a.totalRevenue30d);
+
+    // Sort products within each brand by sales
+    for (const brand of Object.keys(productsByBrand)) {
+      productsByBrand[brand].sort((a, b) => b.sales30d - a.sales30d);
+    }
+
+    const totalLowStock = brands.reduce((sum, b) => sum + b.lowStockCount, 0);
+    const totalOutOfStock = brands.reduce((sum, b) => sum + b.outOfStockCount, 0);
+
+    return {
+      brands,
+      productsByBrand,
+      overview: {
+        totalBrands: brands.length,
+        totalProducts: allProducts.length,
+        totalLowStock,
+        totalOutOfStock,
+        topSellingBrand,
+        topSellingBrandRevenue: Math.round(topSellingBrandRevenue * 100) / 100,
+      },
     };
   }
 
