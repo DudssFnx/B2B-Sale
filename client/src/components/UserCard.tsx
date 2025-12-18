@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type UserRole = "admin" | "sales" | "customer";
+export type UserRole = "admin" | "sales" | "customer" | "supplier";
 export type CustomerType = "atacado" | "varejo";
 
 export interface UserData {

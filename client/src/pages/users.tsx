@@ -48,6 +48,7 @@ export default function UsersPage() {
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserRole, setNewUserRole] = useState<UserRole>("customer");
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
+  const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
 
   const { data: usersData = [], isLoading, refetch } = useQuery<User[]>({
     queryKey: ['/api/users'],
@@ -55,6 +56,10 @@ export default function UsersPage() {
 
   const { data: modulesData = [], isLoading: modulesLoading } = useQuery<Module[]>({
     queryKey: ['/api/modules'],
+  });
+
+  const { data: brandsData = [] } = useQuery<string[]>({
+    queryKey: ['/api/brands'],
   });
 
   const { data: userPermissions } = useQuery<{ userId: string; modules: string[] }>({
@@ -91,7 +96,7 @@ export default function UsersPage() {
   }, [newUserRole, isCreateOpen, modulesData]);
 
   const createUserMutation = useMutation({
-    mutationFn: async (data: { firstName: string; email: string; password: string; role: string }) => {
+    mutationFn: async (data: { firstName: string; email: string; password: string; role: string; allowedBrands?: string[] }) => {
       const response = await apiRequest("POST", "/api/users", data);
       return response.json();
     },
@@ -106,6 +111,7 @@ export default function UsersPage() {
       setNewUserPassword("");
       setNewUserRole("customer");
       setSelectedModules([]);
+      setSelectedBrands([]);
       toast({ title: "Sucesso", description: "Usuario criado com sucesso" });
     },
     onError: (err: Error) => {
@@ -138,6 +144,7 @@ export default function UsersPage() {
       email: newUserEmail,
       password: newUserPassword,
       role: newUserRole,
+      allowedBrands: newUserRole === "supplier" ? selectedBrands : undefined,
     });
   };
 
@@ -352,11 +359,56 @@ export default function UsersPage() {
                       <SelectContent>
                         <SelectItem value="customer">Cliente</SelectItem>
                         <SelectItem value="sales">Vendedor</SelectItem>
+                        <SelectItem value="supplier">Fornecedor</SelectItem>
                         <SelectItem value="admin">Administrador</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+
+                {newUserRole === "supplier" && (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-primary" />
+                      <Label className="text-base font-medium">Marcas Permitidas</Label>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Selecione quais marcas este fornecedor pode visualizar
+                    </p>
+                    {brandsData.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-2">Nenhuma marca cadastrada.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                        {brandsData.map((brand) => (
+                          <div
+                            key={brand}
+                            className="flex items-center space-x-2 p-2 rounded-lg border bg-muted/30 hover-elevate cursor-pointer"
+                            onClick={() => {
+                              setSelectedBrands(prev => 
+                                prev.includes(brand) 
+                                  ? prev.filter(b => b !== brand) 
+                                  : [...prev, brand]
+                              );
+                            }}
+                            data-testid={`checkbox-brand-${brand}`}
+                          >
+                            <Checkbox
+                              checked={selectedBrands.includes(brand)}
+                              onCheckedChange={() => {
+                                setSelectedBrands(prev => 
+                                  prev.includes(brand) 
+                                    ? prev.filter(b => b !== brand) 
+                                    : [...prev, brand]
+                                );
+                              }}
+                            />
+                            <span className="text-sm">{brand}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">

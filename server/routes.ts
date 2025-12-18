@@ -1099,14 +1099,14 @@ export async function registerRoutes(
         return res.status(401).json({ message: "User not found" });
       }
 
-      // Admin and sales can see all brands
+      // Admin and sales can see all brands (with optional filter)
       if (user.role === 'admin' || user.role === 'sales') {
         const brandsFilter = req.query.brands ? (req.query.brands as string).split(',') : undefined;
         const analytics = await storage.getBrandAnalytics(brandsFilter);
         return res.json(analytics);
       }
 
-      // Supplier can only see their allowed brands
+      // Supplier can ONLY see their allowed brands - ignore any query params
       if (user.role === 'supplier') {
         const allowedBrands = user.allowedBrands || [];
         if (allowedBrands.length === 0) {
@@ -1116,6 +1116,7 @@ export async function registerRoutes(
             overview: { totalBrands: 0, totalProducts: 0, totalLowStock: 0, totalOutOfStock: 0, topSellingBrand: null, topSellingBrandRevenue: 0 }
           });
         }
+        // Force supplier to only see their assigned brands - never trust client input
         const analytics = await storage.getBrandAnalytics(allowedBrands);
         return res.json(analytics);
       }
@@ -1127,15 +1128,30 @@ export async function registerRoutes(
     }
   });
 
-  // Get all unique brands (for filter selection)
+  // Get all unique brands (for filter selection) - filtered by role
   app.get('/api/brands', isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user?.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
       const allProducts = await storage.getProducts();
       const brandsSet = new Set<string>();
       allProducts.forEach(p => {
         if (p.brand) brandsSet.add(p.brand);
       });
-      const brands = Array.from(brandsSet).sort();
+      
+      let brands = Array.from(brandsSet).sort();
+      
+      // Supplier can only see their allowed brands
+      if (user.role === 'supplier') {
+        const allowedBrands = user.allowedBrands || [];
+        brands = brands.filter(b => allowedBrands.includes(b));
+      }
+      
       res.json(brands);
     } catch (error) {
       console.error("Error fetching brands:", error);

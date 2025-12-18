@@ -31,6 +31,7 @@ import OrderDetailsPage from "@/pages/order-details";
 import CustomerAnalyticsPage from "@/pages/customer-analytics";
 import ProductAnalyticsPage from "@/pages/product-analytics";
 import PurchasesDashboardPage from "@/pages/purchases-dashboard";
+import BrandAnalyticsPage from "@/pages/brand-analytics";
 import EmployeeAnalyticsPage from "@/pages/employee-analytics";
 import PublicCatalogPage from "@/pages/public-catalog";
 import CheckoutPage from "@/pages/checkout";
@@ -44,7 +45,7 @@ import SuppliersPage from "@/pages/suppliers";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 function AuthenticatedApp() {
-  const { user, logout, isAdmin, isApproved } = useAuth();
+  const { user, logout, isAdmin, isSupplier, isSales, isApproved } = useAuth();
   const { openCart, itemCount } = useCart();
 
   const displayName = user?.firstName && user?.lastName 
@@ -117,6 +118,7 @@ function AuthenticatedApp() {
               {isAdmin && <Route path="/product-analytics" component={ProductAnalyticsPage} />}
               {isAdmin && <Route path="/employee-analytics" component={EmployeeAnalyticsPage} />}
               {isAdmin && <Route path="/purchases" component={PurchasesDashboardPage} />}
+              {(isAdmin || isSales || isSupplier) && <Route path="/brand-analytics" component={BrandAnalyticsPage} />}
               {isAdmin && <Route path="/agenda" component={AgendaPage} />}
               {isAdmin && <Route path="/catalog-customization" component={CatalogCustomizationPage} />}
               {isAdmin && <Route path="/appearance" component={AppearancePage} />}

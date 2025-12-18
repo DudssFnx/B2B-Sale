@@ -42,10 +42,11 @@ import {
   ArrowDownRight,
   Truck,
   Sparkles,
+  Tag,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 
-type UserRole = "admin" | "sales" | "customer";
+type UserRole = "admin" | "sales" | "customer" | "supplier";
 
 interface MenuItem {
   title: string;
@@ -73,6 +74,7 @@ const allMenuItems: MenuItem[] = [
       { title: "Analise de Produtos", url: "/product-analytics", icon: TrendingUp, moduleKey: "reports" },
       { title: "Analise de Funcionarios", url: "/employee-analytics", icon: Users, moduleKey: "reports" },
       { title: "Compras", url: "/purchases", icon: ShoppingCart, moduleKey: "reports" },
+      { title: "Marcas", url: "/brand-analytics", icon: Tag, moduleKey: "reports" },
     ]
   },
   { title: "Categorias", url: "/categories", icon: Grid3X3, moduleKey: "catalog" },
