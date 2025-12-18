@@ -1092,7 +1092,7 @@ export async function registerRoutes(
   // Brand Analytics - for admin/sales and supplier users
   app.get('/api/admin/brand-analytics', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -1131,7 +1131,7 @@ export async function registerRoutes(
   // Get all unique brands (for filter selection) - filtered by role
   app.get('/api/brands', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.id;
+      const userId = req.user?.claims?.sub;
       const user = await storage.getUser(userId);
       
       if (!user) {
