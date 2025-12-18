@@ -537,6 +537,68 @@ async function fetchCategoriesWithRetry(): Promise<BlingCategory[]> {
   throw new Error("Failed to fetch categories after 5 retries");
 }
 
+// Sync categories from scratch (used when clearing all data first)
+async function syncCategoriesClean(): Promise<{ created: number }> {
+  const blingCategories = await fetchCategoriesWithRetry();
+  let created = 0;
+
+  const blingIdToLocalId: Record<number, number> = {};
+  const blingCatMap = new Map<number, BlingCategory>();
+  blingCategories.forEach(c => blingCatMap.set(c.id, c));
+
+  // Topological sort to process parents before children (subcategories)
+  function topologicalSort(cats: BlingCategory[]): BlingCategory[] {
+    const sorted: BlingCategory[] = [];
+    const visited = new Set<number>();
+    
+    function visit(cat: BlingCategory) {
+      if (visited.has(cat.id)) return;
+      visited.add(cat.id);
+      
+      const parentBlingId = cat.categoriaPai?.id;
+      if (parentBlingId && blingCatMap.has(parentBlingId)) {
+        visit(blingCatMap.get(parentBlingId)!);
+      }
+      
+      sorted.push(cat);
+    }
+    
+    cats.forEach(c => visit(c));
+    return sorted;
+  }
+
+  const sortedCategories = topologicalSort(blingCategories);
+  console.log(`Importing ${sortedCategories.length} categories (including subcategories)...`);
+
+  for (const cat of sortedCategories) {
+    const slug = cat.descricao
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || `cat-${cat.id}`;
+
+    const parentBlingId = cat.categoriaPai?.id;
+    const parentLocalId = parentBlingId ? blingIdToLocalId[parentBlingId] || null : null;
+
+    const isSubcategory = !!parentBlingId;
+    console.log(`Creating category: ${cat.descricao} (blingId: ${cat.id})${isSubcategory ? ` - Subcategory of blingId: ${parentBlingId}` : ''}`);
+
+    const [newCat] = await db.insert(categories).values({
+      name: cat.descricao,
+      slug,
+      parentId: parentLocalId,
+      blingId: cat.id,
+    }).returning();
+    
+    blingIdToLocalId[cat.id] = newCat.id;
+    created++;
+  }
+
+  console.log(`Created ${created} categories (including subcategories)`);
+  return { created };
+}
+
 export async function syncProducts(): Promise<{ created: number; updated: number; errors: string[] }> {
   if (syncProgress.status === 'running') {
     throw new Error('Sincronização já em andamento');
@@ -550,19 +612,38 @@ export async function syncProducts(): Promise<{ created: number; updated: number
   try {
     updateProgress({
       status: 'running',
-      phase: 'Sincronizando categorias',
+      phase: 'Limpando dados antigos',
       currentStep: 0,
       totalSteps: 100,
-      message: 'Sincronizando categorias do Bling...',
+      message: 'Apagando produtos existentes...',
       created: 0,
       updated: 0,
       errors: 0,
       startTime,
     });
     
-    console.log("Syncing categories from Bling first...");
-    const catResult = await syncCategories();
-    console.log(`Categories synced: ${catResult.created} created, ${catResult.updated} updated`);
+    // Delete all existing products first
+    console.log("Deleting all existing products...");
+    await db.delete(products);
+    console.log("All products deleted.");
+    
+    updateProgress({
+      message: 'Apagando categorias existentes...',
+    });
+    
+    // Delete all existing categories
+    console.log("Deleting all existing categories...");
+    await db.delete(categories);
+    console.log("All categories deleted.");
+    
+    updateProgress({
+      phase: 'Importando categorias',
+      message: 'Buscando categorias do Bling...',
+    });
+    
+    console.log("Fetching and importing categories from Bling...");
+    const catResult = await syncCategoriesClean();
+    console.log(`Categories imported: ${catResult.created} created`);
     
     updateProgress({
       phase: 'Buscando lista de produtos',
