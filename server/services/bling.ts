@@ -343,76 +343,85 @@ interface BlingStockResponse {
   }>;
 }
 
-interface BlingProductStockResponse {
-  id: number;
-  saldoFisicoTotal: number;
-  saldoVirtualTotal: number;
-  depositos?: Array<{
-    id: number;
-    nome: string;
-    saldoFisico: number;
-    saldoVirtual: number;
-  }>;
+interface BlingStockListItem {
+  produto: { id: number; codigo?: string };
+  deposito?: { id: number; nome?: string };
+  saldoFisico?: number;
+  saldoVirtual?: number;
 }
 
 export async function fetchBlingStock(productIds: number[]): Promise<Map<number, number>> {
   const stockMap = new Map<number, number>();
   
-  console.log(`[fetchBlingStock] Starting stock fetch for ${productIds.length} products (individual mode)`);
+  console.log(`[fetchBlingStock] Starting stock fetch using /estoques endpoint`);
   
-  let processed = 0;
-  let withStock = 0;
+  // Fetch all stock data with pagination
+  let page = 1;
+  const limit = 100;
+  let totalFetched = 0;
   
-  for (const productId of productIds) {
+  while (true) {
     try {
-      const response = await blingApiRequest<{ data: BlingProductStockResponse }>(
-        `/estoques/produtos/${productId}`
+      const response = await blingApiRequest<{ data: BlingStockListItem[] }>(
+        `/estoques?pagina=${page}&limite=${limit}`
       );
       
-      if (response.data) {
-        const item = response.data;
-        let totalStock = item.saldoVirtualTotal || item.saldoFisicoTotal || 0;
-        
-        // If depositos exist, sum them up
-        if (item.depositos && item.depositos.length > 0) {
-          totalStock = item.depositos.reduce((sum, d) => sum + (d.saldoVirtual || d.saldoFisico || 0), 0);
-        }
-        
-        stockMap.set(productId, Math.floor(totalStock));
-        
-        if (totalStock > 0) {
-          withStock++;
-          if (withStock <= 5) {
-            console.log(`[fetchBlingStock] Product ${productId}: stock=${totalStock}, depositos=`, JSON.stringify(item.depositos?.slice(0, 2)));
-          }
-        }
+      if (!response.data || response.data.length === 0) {
+        console.log(`[fetchBlingStock] No more stock data at page ${page}`);
+        break;
       }
       
-      processed++;
-      
-      // Rate limiting - 100ms between requests
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Log progress every 50 products
-      if (processed % 50 === 0) {
-        console.log(`[fetchBlingStock] Progress: ${processed}/${productIds.length} products processed, ${withStock} with stock > 0`);
+      for (const item of response.data) {
+        const productId = item.produto?.id;
+        if (!productId) continue;
+        
+        const stock = item.saldoVirtual ?? item.saldoFisico ?? 0;
+        
+        // Sum stock across all deposits for same product
+        const currentStock = stockMap.get(productId) || 0;
+        stockMap.set(productId, currentStock + Math.floor(stock));
       }
+      
+      totalFetched += response.data.length;
+      console.log(`[fetchBlingStock] Page ${page}: fetched ${response.data.length} stock entries, total: ${totalFetched}`);
+      
+      if (response.data.length < limit) {
+        break;
+      }
+      
+      page++;
+      
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
       
     } catch (error) {
       const errorStr = String(error);
-      if (errorStr.includes("404") || errorStr.includes("RESOURCE_NOT_FOUND")) {
-        // Product has no stock configured - this is normal, set to 0
-        stockMap.set(productId, 0);
-      } else if (errorStr.includes("429")) {
+      if (errorStr.includes("429")) {
         console.log("[fetchBlingStock] Rate limit hit, waiting 30 seconds...");
         await new Promise(resolve => setTimeout(resolve, 30000));
+        continue;
+      } else if (errorStr.includes("404")) {
+        console.log("[fetchBlingStock] Stock endpoint returned 404 - module may not be enabled");
+        break;
       } else {
-        console.error(`[fetchBlingStock] Failed to fetch stock for product ${productId}:`, error);
+        console.error(`[fetchBlingStock] Error fetching stock page ${page}:`, error);
+        break;
       }
     }
   }
   
-  console.log(`[fetchBlingStock] Finished. Total: ${processed}, with stock data: ${stockMap.size}, with stock > 0: ${withStock}`);
+  const withStock = Array.from(stockMap.values()).filter(v => v > 0).length;
+  console.log(`[fetchBlingStock] Finished. Products with stock data: ${stockMap.size}, with stock > 0: ${withStock}`);
+  
+  // Log first 5 products with stock for debugging
+  let logged = 0;
+  const entries = Array.from(stockMap.entries());
+  for (const [productId, stock] of entries) {
+    if (stock > 0 && logged < 5) {
+      console.log(`[fetchBlingStock] Product ${productId}: stock=${stock}`);
+      logged++;
+    }
+  }
   
   return stockMap;
 }
