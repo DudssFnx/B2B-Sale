@@ -28,8 +28,45 @@ Preferred communication style: Simple, everyday language.
 ### Data Layer
 - **Database**: PostgreSQL
 - **ORM**: Drizzle ORM with drizzle-zod for schema validation
-- **Schema Location**: `shared/schema.ts` contains all table definitions and Zod schemas
+- **Schema Location**: Modular schemas in `shared/schema/` directory
 - **Migrations**: Managed via `drizzle-kit push`
+
+### Schema Organization (Dual-Schema Architecture)
+
+O projeto usa arquitetura dual-schema para permitir migração incremental do modelo legado para o novo modelo B2B:
+
+**Estrutura de Arquivos:**
+```
+shared/schema/
+├── index.ts              # Re-exports de todos os schemas
+├── legacy.schema.ts      # Schema original (users, products, orders, etc.)
+├── companies.schema.ts   # Tabela companies (multi-tenant)
+├── users.schema.ts       # b2b_users (novo modelo de usuário)
+├── userCompanies.schema.ts # Relacionamento N:N user-company
+├── products.schema.ts    # b2b_products (preco_varejo/atacado)
+├── orders.schema.ts      # b2b_orders (channel, status, etapa)
+├── orderItems.schema.ts  # b2b_order_items (snapshot comercial)
+└── orderItemDiscounts.schema.ts # Governança de descontos
+```
+
+**Tabelas Legadas (em uso):**
+- `users`, `products`, `categories`, `orders`, `order_items`
+- `customer_credits`, `accounts_payable`, `modules`, etc.
+
+**Novas Tabelas B2B (preparadas para migração):**
+- `companies` - Multi-tenant: empresa como entidade principal
+- `b2b_users` - Usuários com vínculo a empresas
+- `user_companies` - Relacionamento N:N (usuário pode operar múltiplas empresas)
+- `b2b_products` - Produtos com preço varejo e atacado separados
+- `b2b_orders` - Pedidos com company_id, channel, status/etapa
+- `b2b_order_items` - Itens com snapshot comercial completo
+- `order_item_discounts` - Workflow de aprovação de descontos
+
+**Estratégia de Migração:**
+1. Código legado continua usando tabelas originais via exports do legacy.schema.ts
+2. Novas funcionalidades podem usar tabelas b2b_*
+3. Services/adapters traduzem entre modelos durante transição
+4. Após migração completa, tabelas legadas serão removidas
 
 ### Role-Based Access Control
 Four user roles with hierarchical permissions:
