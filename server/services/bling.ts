@@ -77,6 +77,8 @@ interface BlingCategory {
 
 let cachedTokens: BlingTokens | null = null;
 let tokenExpiresAt: number = 0;
+let isRefreshing: boolean = false;
+let refreshPromise: Promise<BlingTokens> | null = null;
 
 // ========== SYNC PROGRESS MANAGEMENT ==========
 export interface SyncProgress {
@@ -203,37 +205,60 @@ export async function exchangeCodeForTokens(code: string, redirectUri: string): 
 }
 
 export async function refreshAccessToken(): Promise<BlingTokens> {
+  // Prevent concurrent refresh attempts
+  if (isRefreshing && refreshPromise) {
+    console.log("[Bling] Waiting for ongoing token refresh...");
+    return refreshPromise;
+  }
+  
   const refreshToken = process.env.BLING_REFRESH_TOKEN;
   if (!refreshToken) {
     throw new Error("No refresh token available. Please re-authorize.");
   }
 
-  const response = await fetch(`${BLING_OAUTH_URL}/token`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Authorization": `Basic ${getBasicAuthHeader()}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("Bling token refresh error:", error);
-    throw new Error(`Failed to refresh token: ${response.status}`);
-  }
-
-  const tokens: BlingTokens = await response.json();
-  cachedTokens = tokens;
-  tokenExpiresAt = Date.now() + (tokens.expires_in * 1000) - 60000;
+  isRefreshing = true;
   
-  process.env.BLING_ACCESS_TOKEN = tokens.access_token;
-  process.env.BLING_REFRESH_TOKEN = tokens.refresh_token;
+  refreshPromise = (async () => {
+    try {
+      console.log("[Bling] Refreshing access token...");
+      const response = await fetch(`${BLING_OAUTH_URL}/token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Authorization": `Basic ${getBasicAuthHeader()}`,
+        },
+        body: new URLSearchParams({
+          grant_type: "refresh_token",
+          refresh_token: refreshToken,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error("[Bling] Token refresh error:", error);
+        // Clear cached data on refresh failure
+        cachedTokens = null;
+        tokenExpiresAt = 0;
+        throw new Error(`Failed to refresh token: ${response.status}`);
+      }
+
+      const tokens: BlingTokens = await response.json();
+      cachedTokens = tokens;
+      // Set expiration with 2-minute buffer for safety
+      tokenExpiresAt = Date.now() + (tokens.expires_in * 1000) - 120000;
+      
+      process.env.BLING_ACCESS_TOKEN = tokens.access_token;
+      process.env.BLING_REFRESH_TOKEN = tokens.refresh_token;
+      
+      console.log("[Bling] Token refreshed successfully. Expires at:", new Date(tokenExpiresAt).toISOString());
+      return tokens;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
   
-  return tokens;
+  return refreshPromise;
 }
 
 async function getValidAccessToken(): Promise<string> {
@@ -243,7 +268,21 @@ async function getValidAccessToken(): Promise<string> {
     throw new Error("Not authenticated with Bling. Please authorize first.");
   }
   
-  // Always return the access token - refresh will happen on 401 in blingApiRequest
+  // Proactive refresh: if token is close to expiring (within 5 minutes), refresh it now
+  const now = Date.now();
+  const fiveMinutes = 5 * 60 * 1000;
+  
+  if (tokenExpiresAt > 0 && (tokenExpiresAt - now) < fiveMinutes) {
+    console.log("[Bling] Token expiring soon, proactively refreshing...");
+    try {
+      const tokens = await refreshAccessToken();
+      return tokens.access_token;
+    } catch (error) {
+      console.error("[Bling] Proactive refresh failed, using existing token:", error);
+      // Fall through to use existing token - it might still work
+    }
+  }
+  
   return accessToken;
 }
 
