@@ -121,13 +121,15 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
-const PRODUCTS_PER_PAGE = 40;
+const PRODUCTS_PER_PAGE = 50;
 
 export default function ProductsPage() {
   const { toast } = useToast();
   const { isAdmin } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterCategory, setFilterCategory] = useState<string>("");
+  const [filterBrand, setFilterBrand] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "form">("list");
   const [editingProduct, setEditingProduct] = useState<ProductData | null>(null);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -210,11 +212,14 @@ export default function ProductsPage() {
     },
   });
 
-  const filteredProducts = products.filter(
-    (p) =>
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch = 
       p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.sku.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      p.sku.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = !filterCategory || String(p.categoryId) === filterCategory;
+    const matchesBrand = !filterBrand || p.brand.toLowerCase() === filterBrand.toLowerCase();
+    return matchesSearch && matchesCategory && matchesBrand;
+  });
 
   // Pagination logic
   const totalPages = Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE);
@@ -222,9 +227,19 @@ export default function ProductsPage() {
   const endIndex = startIndex + PRODUCTS_PER_PAGE;
   const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Reset to page 1 when search changes
+  // Reset to page 1 when filters change
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
+    setCurrentPage(1);
+  };
+
+  const handleCategoryFilter = (value: string) => {
+    setFilterCategory(value === "all" ? "" : value);
+    setCurrentPage(1);
+  };
+
+  const handleBrandFilter = (value: string) => {
+    setFilterBrand(value === "all" ? "" : value);
     setCurrentPage(1);
   };
 
@@ -1484,8 +1499,8 @@ export default function ProductsPage() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome ou codigo..."
@@ -1495,6 +1510,28 @@ export default function ProductsPage() {
             data-testid="input-search-products"
           />
         </div>
+        <Select value={filterCategory || "all"} onValueChange={handleCategoryFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="filter-category">
+            <SelectValue placeholder="Categoria" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Categorias</SelectItem>
+            {categoriesData.map((cat) => (
+              <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterBrand || "all"} onValueChange={handleBrandFilter}>
+          <SelectTrigger className="w-[180px]" data-testid="filter-brand">
+            <SelectValue placeholder="Marca" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas Marcas</SelectItem>
+            {brandsData.map((brand) => (
+              <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <p className="text-sm text-muted-foreground">
           {filteredProducts.length} produto(s)
           {totalPages > 1 && ` - Pagina ${currentPage} de ${totalPages}`}
