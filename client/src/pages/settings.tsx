@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
-import { Database, Link2, Bell, Shield, Palette, Check, UserCheck, ShoppingBag, Store, Percent } from "lucide-react";
+import { Database, Link2, Bell, Shield, Palette, Check, UserCheck, ShoppingBag, Store, Percent, AlertTriangle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -101,6 +101,10 @@ export default function SettingsPage() {
     queryKey: ['/api/settings/retail_markup_percentage'],
   });
 
+  const { data: catalogMaintenanceSetting } = useQuery<{ key: string; value: string | null }>({
+    queryKey: ['/api/settings/catalog_maintenance_mode'],
+  });
+
   const agePopupMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       return apiRequest('POST', '/api/settings/age_verification_popup', { value: enabled ? 'true' : 'false' });
@@ -153,9 +157,23 @@ export default function SettingsPage() {
     },
   });
 
+  const catalogMaintenanceMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      return apiRequest('POST', '/api/settings/catalog_maintenance_mode', { value: enabled ? 'true' : 'false' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/settings/catalog_maintenance_mode'] });
+      toast({ title: "Configuração salva", description: "Status do catálogo atualizado." });
+    },
+    onError: () => {
+      toast({ title: "Erro", description: "Não foi possível salvar a configuração.", variant: "destructive" });
+    },
+  });
+
   const isAgePopupEnabled = agePopupSetting?.value === 'true';
   const isDeliveryModeEnabled = deliveryModeSetting?.value === 'true';
   const isRetailModeEnabled = retailModeSetting?.value === 'true';
+  const isCatalogMaintenanceMode = catalogMaintenanceSetting?.value === 'true';
   const retailMarkupPercentage = retailMarkupSetting?.value || '30';
   const [markupInput, setMarkupInput] = useState(retailMarkupPercentage);
 
@@ -292,6 +310,40 @@ export default function SettingsPage() {
                 data-testid="switch-notifications"
               />
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className={isCatalogMaintenanceMode ? "border-destructive" : ""}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className={`h-5 w-5 ${isCatalogMaintenanceMode ? "text-destructive" : ""}`} />
+              Modo Manutenção
+            </CardTitle>
+            <CardDescription>Desative temporariamente o acesso ao catálogo</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Catálogo em Manutenção</Label>
+                <p className="text-sm text-muted-foreground">
+                  Quando ativado, o site exibe uma mensagem de manutenção
+                </p>
+              </div>
+              <Switch
+                checked={isCatalogMaintenanceMode}
+                onCheckedChange={(checked) => catalogMaintenanceMutation.mutate(checked)}
+                disabled={catalogMaintenanceMutation.isPending}
+                data-testid="switch-catalog-maintenance"
+              />
+            </div>
+            {isCatalogMaintenanceMode && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                <p className="text-sm font-medium text-destructive">Catálogo Desativado</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Os clientes verão uma mensagem de manutenção e não poderão visualizar produtos ou fazer pedidos.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

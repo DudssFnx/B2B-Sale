@@ -90,13 +90,10 @@ export default function CheckoutPage() {
   const [paymentTypeId, setPaymentTypeId] = useState<number | null>(null);
   const [paymentNotes, setPaymentNotes] = useState("");
   
-  // Fetch payment types from database
-  const { data: paymentTypes = [], isLoading: loadingPaymentTypes } = useQuery<PaymentType[]>({
-    queryKey: ["/api/payment-types"],
+  // Fetch active payment types from public endpoint
+  const { data: activePaymentTypes = [], isLoading: loadingPaymentTypes } = useQuery<PaymentType[]>({
+    queryKey: ["/api/public/payment-types"],
   });
-  
-  // Filter only active payment types
-  const activePaymentTypes = paymentTypes.filter(pt => pt.active);
   
   // Guest checkout state
   const [isGuestCheckout, setIsGuestCheckout] = useState(false);

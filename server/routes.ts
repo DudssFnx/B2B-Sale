@@ -1698,6 +1698,17 @@ export async function registerRoutes(
   });
 
   // ========== SITE SETTINGS ==========
+  
+  // Public endpoint for specific settings (for catalog)
+  app.get('/api/public/settings/:key', async (req, res) => {
+    try {
+      const setting = await storage.getSiteSetting(req.params.key);
+      res.json({ key: req.params.key, value: setting?.value || null });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch setting" });
+    }
+  });
+  
   app.get('/api/settings/:key', async (req, res) => {
     try {
       const setting = await storage.getSiteSetting(req.params.key);
@@ -3440,6 +3451,17 @@ export async function registerRoutes(
   });
 
   // ========== PAYMENT TYPES ==========
+  
+  // Public endpoint for active payment types (for checkout)
+  app.get("/api/public/payment-types", async (req, res) => {
+    try {
+      const paymentTypes = await storage.getPaymentTypes();
+      const activePaymentTypes = paymentTypes.filter(pt => pt.active);
+      res.json(activePaymentTypes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch payment types" });
+    }
+  });
   
   app.get("/api/payment-types", isAuthenticated, async (req, res) => {
     try {
