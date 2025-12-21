@@ -52,3 +52,21 @@ export {
 
 // Export enums from companies schema
 export { tipoClienteEnum, approvalStatusEnum } from "./companies.schema";
+
+// Export payment schemas
+export {
+  paymentTypes,
+  insertPaymentTypeSchema,
+  type InsertPaymentType,
+  type PaymentType,
+  paymentIntegrations,
+  insertPaymentIntegrationSchema,
+  type InsertPaymentIntegration,
+  type PaymentIntegration,
+  paymentTransactions,
+  insertPaymentTransactionSchema,
+  type InsertPaymentTransaction,
+  type PaymentTransaction,
+  feeTypeEnum,
+  integrationStatusEnum
+} from "./payments.schema";

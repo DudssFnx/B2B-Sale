@@ -19,7 +19,9 @@ import {
   type PayablePayment, type InsertPayablePayment,
   type Module, type InsertModule,
   type UserModulePermission, type InsertUserModulePermission,
-  users, categories, suppliers, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments, accountsPayable, payablePayments, modules, userModulePermissions
+  type PaymentType, type InsertPaymentType,
+  type PaymentIntegration, type InsertPaymentIntegration,
+  users, categories, suppliers, products, orders, orderItems, priceTables, customerPrices, coupons, agendaEvents, siteSettings, catalogBanners, catalogSlides, catalogConfig, customerCredits, creditPayments, accountsPayable, payablePayments, modules, userModulePermissions, paymentTypes, paymentIntegrations
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, ilike, and, or, sql, count } from "drizzle-orm";
@@ -188,6 +190,20 @@ export interface IStorage {
   getUserPermissionKeys(userId: string): Promise<string[]>;
   setUserPermissions(userId: string, moduleKeys: string[]): Promise<void>;
   hasModuleAccess(userId: string, moduleKey: string): Promise<boolean>;
+
+  // Payment Types
+  getPaymentTypes(): Promise<PaymentType[]>;
+  getPaymentType(id: number): Promise<PaymentType | undefined>;
+  createPaymentType(paymentType: InsertPaymentType): Promise<PaymentType>;
+  updatePaymentType(id: number, paymentType: Partial<InsertPaymentType>): Promise<PaymentType | undefined>;
+  deletePaymentType(id: number): Promise<boolean>;
+
+  // Payment Integrations
+  getPaymentIntegrations(): Promise<PaymentIntegration[]>;
+  getPaymentIntegration(id: number): Promise<PaymentIntegration | undefined>;
+  createPaymentIntegration(integration: InsertPaymentIntegration): Promise<PaymentIntegration>;
+  updatePaymentIntegration(id: number, integration: Partial<InsertPaymentIntegration>): Promise<PaymentIntegration | undefined>;
+  deletePaymentIntegration(id: number): Promise<boolean>;
 }
 
 // Customer Analytics Types
@@ -3172,6 +3188,62 @@ export class DatabaseStorage implements IStorage {
       ));
     
     return !!permission;
+  }
+
+  // ========== PAYMENT TYPES ==========
+  async getPaymentTypes(): Promise<PaymentType[]> {
+    return db.select().from(paymentTypes).orderBy(paymentTypes.sortOrder);
+  }
+
+  async getPaymentType(id: number): Promise<PaymentType | undefined> {
+    const [paymentType] = await db.select().from(paymentTypes).where(eq(paymentTypes.id, id));
+    return paymentType;
+  }
+
+  async createPaymentType(paymentType: InsertPaymentType): Promise<PaymentType> {
+    const [newPaymentType] = await db.insert(paymentTypes).values(paymentType).returning();
+    return newPaymentType;
+  }
+
+  async updatePaymentType(id: number, paymentType: Partial<InsertPaymentType>): Promise<PaymentType | undefined> {
+    const [updated] = await db.update(paymentTypes)
+      .set({ ...paymentType, updatedAt: new Date() })
+      .where(eq(paymentTypes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePaymentType(id: number): Promise<boolean> {
+    const result = await db.delete(paymentTypes).where(eq(paymentTypes.id, id));
+    return true;
+  }
+
+  // ========== PAYMENT INTEGRATIONS ==========
+  async getPaymentIntegrations(): Promise<PaymentIntegration[]> {
+    return db.select().from(paymentIntegrations);
+  }
+
+  async getPaymentIntegration(id: number): Promise<PaymentIntegration | undefined> {
+    const [integration] = await db.select().from(paymentIntegrations).where(eq(paymentIntegrations.id, id));
+    return integration;
+  }
+
+  async createPaymentIntegration(integration: InsertPaymentIntegration): Promise<PaymentIntegration> {
+    const [newIntegration] = await db.insert(paymentIntegrations).values(integration).returning();
+    return newIntegration;
+  }
+
+  async updatePaymentIntegration(id: number, integration: Partial<InsertPaymentIntegration>): Promise<PaymentIntegration | undefined> {
+    const [updated] = await db.update(paymentIntegrations)
+      .set({ ...integration, updatedAt: new Date() })
+      .where(eq(paymentIntegrations.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deletePaymentIntegration(id: number): Promise<boolean> {
+    const result = await db.delete(paymentIntegrations).where(eq(paymentIntegrations.id, id));
+    return true;
   }
 }
 

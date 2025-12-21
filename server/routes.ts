@@ -3349,6 +3349,7 @@ export async function registerRoutes(
         { key: "pdv", label: "PDV", description: "Ponto de Venda / Orcamento rapido", icon: "Monitor", defaultRoles: ["admin", "sales"], sortOrder: 10 },
         { key: "agenda", label: "Agenda", description: "Calendario de eventos", icon: "Calendar", defaultRoles: ["admin", "sales"], sortOrder: 11 },
         { key: "brands", label: "Marcas", description: "Visualizar analytics de marcas", icon: "Tag", defaultRoles: ["admin", "supplier"], sortOrder: 12 },
+        { key: "payments", label: "Pagamentos", description: "Gerenciar tipos de pagamento e integracoes", icon: "CreditCard", defaultRoles: ["admin"], sortOrder: 13 },
       ];
 
       for (const mod of defaultModules) {
@@ -3433,6 +3434,112 @@ export async function registerRoutes(
       res.json({ modules: defaultModules, role: userRole });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch permissions" });
+    }
+  });
+
+  // ========== PAYMENT TYPES ==========
+  
+  app.get("/api/payment-types", isAuthenticated, async (req, res) => {
+    try {
+      const paymentTypes = await storage.getPaymentTypes();
+      res.json(paymentTypes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch payment types" });
+    }
+  });
+
+  app.get("/api/payment-types/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const paymentType = await storage.getPaymentType(parseInt(req.params.id));
+      if (!paymentType) {
+        return res.status(404).json({ message: "Payment type not found" });
+      }
+      res.json(paymentType);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch payment type" });
+    }
+  });
+
+  app.post("/api/payment-types", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const paymentType = await storage.createPaymentType(req.body);
+      res.status(201).json(paymentType);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create payment type" });
+    }
+  });
+
+  app.patch("/api/payment-types/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const paymentType = await storage.updatePaymentType(parseInt(req.params.id), req.body);
+      if (!paymentType) {
+        return res.status(404).json({ message: "Payment type not found" });
+      }
+      res.json(paymentType);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update payment type" });
+    }
+  });
+
+  app.delete("/api/payment-types/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deletePaymentType(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete payment type" });
+    }
+  });
+
+  // ========== PAYMENT INTEGRATIONS ==========
+  
+  app.get("/api/payment-integrations", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const integrations = await storage.getPaymentIntegrations();
+      res.json(integrations);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch payment integrations" });
+    }
+  });
+
+  app.get("/api/payment-integrations/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const integration = await storage.getPaymentIntegration(parseInt(req.params.id));
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+      res.json(integration);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch integration" });
+    }
+  });
+
+  app.post("/api/payment-integrations", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const integration = await storage.createPaymentIntegration(req.body);
+      res.status(201).json(integration);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create integration" });
+    }
+  });
+
+  app.patch("/api/payment-integrations/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const integration = await storage.updatePaymentIntegration(parseInt(req.params.id), req.body);
+      if (!integration) {
+        return res.status(404).json({ message: "Integration not found" });
+      }
+      res.json(integration);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update integration" });
+    }
+  });
+
+  app.delete("/api/payment-integrations/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.deletePaymentIntegration(parseInt(req.params.id));
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete integration" });
     }
   });
 

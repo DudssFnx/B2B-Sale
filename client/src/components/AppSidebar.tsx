@@ -43,6 +43,7 @@ import {
   Truck,
   Sparkles,
   Tag,
+  CreditCard,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 
@@ -91,6 +92,7 @@ const allMenuItems: MenuItem[] = [
     subItems: [
       { title: "Contas a Receber", url: "/contas-receber", icon: ArrowUpRight, moduleKey: "financial_receivables" },
       { title: "Contas a Pagar", url: "/contas-pagar", icon: ArrowDownRight, moduleKey: "financial_payables" },
+      { title: "Pagamentos", url: "/payments", icon: CreditCard, moduleKey: "payments" },
     ]
   },
   { title: "Agenda", url: "/agenda", icon: Calendar, moduleKey: "agenda" },

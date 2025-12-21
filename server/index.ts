@@ -3,6 +3,8 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initializeBlingTokens } from "./services/bling";
+import { pool } from "./db";
+
 
 const app = express();
 const httpServer = createServer(app);
@@ -22,6 +24,21 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+
+app.get("/health/db", async (_req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "ok", database: "connected" });
+  } catch (error) {
+    console.error("[DB HEALTH]", error);
+    res.status(500).json({
+      status: "error",
+      message: "database not connected",
+    });
+  }
+});
+
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {

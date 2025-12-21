@@ -42,6 +42,7 @@ import ContasReceberPage from "@/pages/contas-receber";
 import ContasPagarPage from "@/pages/contas-pagar";
 import AppearancePage from "@/pages/appearance";
 import SuppliersPage from "@/pages/suppliers";
+import PaymentsPage from "@/pages/payments";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 function AuthenticatedApp() {
@@ -122,6 +123,7 @@ function AuthenticatedApp() {
               {isAdmin && <Route path="/agenda" component={AgendaPage} />}
               {isAdmin && <Route path="/catalog-customization" component={CatalogCustomizationPage} />}
               {isAdmin && <Route path="/appearance" component={AppearancePage} />}
+              {isAdmin && <Route path="/payments" component={PaymentsPage} />}
               <Route path="/contas-receber" component={ContasReceberPage} />
               <Route path="/contas-pagar" component={ContasPagarPage} />
               <Route component={NotFound} />
