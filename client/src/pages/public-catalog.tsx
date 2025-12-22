@@ -65,17 +65,7 @@ export default function PublicCatalogPage() {
     queryKey: ['/api/settings/delivery_catalog_mode'],
   });
 
-  const { data: maintenanceModeSetting } = useQuery<{ key: string; value: string | null }>({
-    queryKey: ['/api/public/settings/catalog_maintenance_mode'],
-    queryFn: async () => {
-      const res = await fetch('/api/public/settings/catalog_maintenance_mode');
-      if (!res.ok) throw new Error('Failed to fetch maintenance setting');
-      return res.json();
-    },
-  });
-
   const isDeliveryMode = deliveryModeSetting?.value === 'true';
-  const isMaintenanceMode = maintenanceModeSetting?.value === 'true';
 
   useEffect(() => {
     const params = new URLSearchParams(searchString);
@@ -147,12 +137,11 @@ export default function PublicCatalogPage() {
   }, [productsData]);
 
   const filteredProducts = useMemo(() => {
-    if (isMaintenanceMode) return [];
     return productsData.filter((product) => {
       const matchesBrand = brand === "all" || product.brand === brand;
       return matchesBrand;
     });
-  }, [productsData, brand, isMaintenanceMode]);
+  }, [productsData, brand]);
 
   const clearFilters = () => {
     setSearchQuery("");
