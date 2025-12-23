@@ -3,49 +3,47 @@ import { b2bUsers } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
-const SUPER_ADMIN_EMAIL = "eduardobarbosadossantos02@gmail.com";
-const SUPER_ADMIN_PASSWORD = "Edu@5622";
-const SUPER_ADMIN_NAME = "Eduardo ADMIN";
+const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || "")
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
-async function seedSuperAdmin() {
-  console.log("[SEED] Verificando usuário SUPER_ADMIN...");
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_DEFAULT_PASSWORD || "ChangeMe@2024!";
 
-  const [existing] = await db
-    .select()
-    .from(b2bUsers)
-    .where(eq(b2bUsers.email, SUPER_ADMIN_EMAIL));
-
-  if (existing) {
-    console.log("[SEED] SUPER_ADMIN já existe:", existing.email);
-    return existing;
+export async function seedSuperAdmin() {
+  if (SUPER_ADMIN_EMAILS.length === 0) {
+    console.log("[SEED] No SUPER_ADMIN_EMAILS configured, skipping seed");
+    return;
   }
 
-  const hashedPassword = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 10);
+  console.log("[SEED] Verificando usuários SUPER_ADMIN...");
 
-  const [superAdmin] = await db
-    .insert(b2bUsers)
-    .values({
-      nome: SUPER_ADMIN_NAME,
-      email: SUPER_ADMIN_EMAIL,
-      senhaHash: hashedPassword,
-      ativo: true,
-    })
-    .returning();
+  for (const email of SUPER_ADMIN_EMAILS) {
+    const [existing] = await db
+      .select()
+      .from(b2bUsers)
+      .where(eq(b2bUsers.email, email));
 
-  console.log("[SEED] SUPER_ADMIN criado com sucesso!");
-  console.log("[SEED] Email:", SUPER_ADMIN_EMAIL);
-  console.log("[SEED] Senha inicial:", SUPER_ADMIN_PASSWORD);
-  console.log("[SEED] IMPORTANTE: Altere a senha após o primeiro login!");
+    if (existing) {
+      console.log("[SEED] SUPER_ADMIN já existe:", email);
+      continue;
+    }
 
-  return superAdmin;
+    const hashedPassword = await bcrypt.hash(SUPER_ADMIN_PASSWORD, 10);
+    const name = email.split("@")[0].replace(/[^a-zA-Z]/g, " ").trim() || "Super Admin";
+
+    const [superAdmin] = await db
+      .insert(b2bUsers)
+      .values({
+        nome: name,
+        email: email,
+        senhaHash: hashedPassword,
+        ativo: true,
+      })
+      .returning();
+
+    console.log("[SEED] SUPER_ADMIN criado:", email);
+  }
+
+  console.log("[SEED] Seed SUPER_ADMIN concluído");
 }
-
-seedSuperAdmin()
-  .then(() => {
-    console.log("[SEED] Concluído.");
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error("[SEED] Erro:", error);
-    process.exit(1);
-  });

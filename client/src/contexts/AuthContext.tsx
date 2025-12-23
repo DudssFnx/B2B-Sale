@@ -32,7 +32,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isSales = user?.role === "sales";
   const isCustomer = user?.role === "customer";
   const isSupplier = user?.role === "supplier";
-  const isApproved = user?.approved || isAdmin;
+  const isSuperAdmin = !!(user as any)?.isSuperAdmin;
+  const isApproved = user?.approved || isAdmin || isSuperAdmin;
 
   return (
     <AuthContext.Provider

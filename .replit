@@ -45,3 +45,4 @@ integrations = ["javascript_log_in_with_replit:1.0.0", "javascript_database:1.0.
 
 [userenv.shared]
 SUPER_ADMIN_EMAILS = "admin@sistema.com,eduardobarbosadossantos02@gmail.com"
+SUPER_ADMIN_DEFAULT_PASSWORD = "Edu@5622"

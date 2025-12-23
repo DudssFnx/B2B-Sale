@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { initializeBlingTokens } from "./services/bling";
 import { pool } from "./db";
+import { seedSuperAdmin } from "./scripts/seedSuperAdmin";
 
 
 const app = express();
@@ -80,6 +81,13 @@ app.use((req, res, next) => {
 (async () => {
   await registerRoutes(httpServer, app);
   
+  // Seed SUPER_ADMIN user on startup (creates if not exists)
+  try {
+    await seedSuperAdmin();
+  } catch (error) {
+    console.error("[SEED] Failed to seed SUPER_ADMIN:", error);
+  }
+
   // Initialize Bling tokens from database on server startup
   try {
     const blingInitialized = await initializeBlingTokens();

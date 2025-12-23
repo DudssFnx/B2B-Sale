@@ -107,13 +107,41 @@ export async function registerRoutes(
     });
   }
 
-  function isApproved(req: any, res: any, next: any) {
-    storage.getUser(req.user?.claims?.sub).then((user) => {
+  async function isApproved(req: any, res: any, next: any) {
+    try {
+      const userId = req.user?.claims?.sub;
+      const isB2bUser = req.user?.isB2bUser;
+      
+      // Guard: if no userId, return 401
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
+      // Check if SUPER_ADMIN (always approved)
+      const isSuperAdmin = await checkIsSuperAdmin(userId);
+      if (isSuperAdmin) {
+        return next();
+      }
+      
+      // For B2B users, check if they exist and are active
+      if (isB2bUser) {
+        const [b2bUser] = await db.select().from(b2bUsers).where(eq(b2bUsers.id, userId));
+        if (!b2bUser || !b2bUser.ativo) {
+          return res.status(403).json({ message: "Account pending approval" });
+        }
+        return next();
+      }
+      
+      // For legacy users
+      const user = await storage.getUser(userId);
       if (!user || (!user.approved && user.role !== "admin")) {
         return res.status(403).json({ message: "Account pending approval" });
       }
       next();
-    });
+    } catch (error) {
+      console.error("[isApproved] Error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   }
 
   // Public registration endpoint
