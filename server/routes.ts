@@ -181,6 +181,7 @@ export async function registerRoutes(
   app.post("/api/auth/login", async (req: any, res) => {
     try {
       const { email, password } = req.body;
+      console.log("[Login] Attempt for email:", email);
 
       if (!email || !password) {
         return res
@@ -191,6 +192,7 @@ export async function registerRoutes(
       // Try legacy users first
       const user = await storage.getUserByEmail(email);
       if (user) {
+        console.log("[Login] Found legacy user:", user.id);
         if (!user.password) {
           return res
             .status(401)
@@ -199,6 +201,7 @@ export async function registerRoutes(
 
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
+          console.log("[Login] Invalid password for legacy user");
           return res.status(401).json({ message: "E-mail ou senha incorretos" });
         }
 
@@ -212,16 +215,19 @@ export async function registerRoutes(
 
         return req.login(sessionUser, (err: any) => {
           if (err) {
-            console.error("Login error:", err);
+            console.error("[Login] Session creation error for legacy user:", err);
             return res.status(500).json({ message: "Erro ao fazer login" });
           }
+          console.log("[Login] Success for legacy user:", user.id);
           res.json({ message: "Login realizado com sucesso", user });
         });
       }
 
       // Try B2B users
+      console.log("[Login] Checking B2B users...");
       const [b2bUser] = await db.select().from(b2bUsers).where(eq(b2bUsers.email, email));
       if (b2bUser) {
+        console.log("[Login] Found B2B user:", b2bUser.id);
         if (!b2bUser.senhaHash) {
           return res
             .status(401)
@@ -229,11 +235,13 @@ export async function registerRoutes(
         }
 
         if (!b2bUser.ativo) {
+          console.log("[Login] B2B user inactive");
           return res.status(401).json({ message: "Conta desativada" });
         }
 
         const isValidPassword = await bcrypt.compare(password, b2bUser.senhaHash);
         if (!isValidPassword) {
+          console.log("[Login] Invalid password for B2B user");
           return res.status(401).json({ message: "E-mail ou senha incorretos" });
         }
 
@@ -247,16 +255,18 @@ export async function registerRoutes(
 
         return req.login(sessionUser, (err: any) => {
           if (err) {
-            console.error("Login error:", err);
+            console.error("[Login] Session creation error for B2B user:", err);
             return res.status(500).json({ message: "Erro ao fazer login" });
           }
+          console.log("[Login] Success for B2B user:", b2bUser.id);
           res.json({ message: "Login realizado com sucesso", user: b2bUser });
         });
       }
 
+      console.log("[Login] User not found:", email);
       return res.status(401).json({ message: "E-mail ou senha incorretos" });
     } catch (error) {
-      console.error("Login error:", error);
+      console.error("[Login] Exception:", error);
       res.status(500).json({ message: "Erro ao fazer login" });
     }
   });

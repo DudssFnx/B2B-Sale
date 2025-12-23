@@ -3,9 +3,9 @@ import { b2bUsers } from "@shared/schema";
 import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
 
-const SUPER_ADMIN_EMAIL = "admin@sistema.com";
-const SUPER_ADMIN_PASSWORD = "SuperAdmin@2024!";
-const SUPER_ADMIN_NAME = "Administrador do Sistema";
+const SUPER_ADMIN_EMAIL = "eduardobarbosadossantos02@gmail.com";
+const SUPER_ADMIN_PASSWORD = "Edu@5622";
+const SUPER_ADMIN_NAME = "Eduardo ADMIN";
 
 async function seedSuperAdmin() {
   console.log("[SEED] Verificando usuário SUPER_ADMIN...");
