@@ -72,3 +72,27 @@ export async function getCompanyById(companyId: string) {
 
   return company ?? null;
 }
+
+/**
+ * Lista TODAS as empresas (apenas SUPER_ADMIN)
+ */
+export async function getAllCompanies() {
+  const rows = await db.select().from(companies);
+  return rows;
+}
+
+/**
+ * Atualiza status de aprovação de empresa (apenas SUPER_ADMIN)
+ */
+export async function updateCompanyApprovalStatus(
+  companyId: string,
+  approvalStatus: "PENDENTE" | "APROVADO" | "REPROVADO"
+) {
+  const [updated] = await db
+    .update(companies)
+    .set({ approvalStatus })
+    .where(eq(companies.id, companyId))
+    .returning();
+
+  return updated ?? null;
+}

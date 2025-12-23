@@ -55,3 +55,16 @@ Preferred communication style: Simple, everyday language.
 
 ### Integrations
 - **Bling API v3**: Integrated for product and category synchronization, webhooks for real-time updates, and automatic order submission.
+
+### SUPER_ADMIN System
+- **Purpose**: Provides system-level administration for managing all companies, users, and global settings.
+- **Identification**: SUPER_ADMIN status is determined by:
+  - Email present in `SUPER_ADMIN_EMAILS` environment variable (comma-separated list)
+  - OR legacy user with `role === "SUPER_ADMIN"`
+- **Key Characteristics**:
+  - Not linked to any company (operates at system level)
+  - Cannot create orders or access customer catalog
+  - Has access to `/api/superadmin/*` routes for global management
+- **Protected Routes**: All `/api/superadmin/*` endpoints require `requireSuperAdmin` middleware
+- **Seed Script**: `server/scripts/seedSuperAdmin.ts` creates initial SUPER_ADMIN user in `b2b_users` table
+- **Security**: Normal users (even company admins with `is_admin=true`) cannot access SUPER_ADMIN routes

@@ -1,5 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 
+declare module "express-session" {
+  interface SessionData {
+    activeCompanyId?: string;
+  }
+}
+
 export function requireCompany(
   req: Request,
   res: Response,

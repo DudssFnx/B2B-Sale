@@ -2,7 +2,7 @@ import { type Express } from "express";
 import { type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
-import { products, orderItems, orders } from "@shared/schema";
+import { products, orderItems, orders, b2bUsers } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import {
@@ -19,6 +19,8 @@ import { Client } from "@replit/object-storage";
 import * as blingService from "./services/bling";
 import bcrypt from "bcryptjs";
 import PDFDocument from "pdfkit";
+import { requireSuperAdmin, checkIsSuperAdmin } from "./middleware/superAdmin";
+import * as companiesService from "./services/companies.service";
 
 /* =========================================================
    SINGLE AND CORRECT registerRoutes
@@ -175,7 +177,7 @@ export async function registerRoutes(
     }
   });
 
-  // Local login endpoint (email/password)
+  // Local login endpoint (email/password) - supports both legacy users and B2B users
   app.post("/api/auth/login", async (req: any, res) => {
     try {
       const { email, password } = req.body;
@@ -186,37 +188,73 @@ export async function registerRoutes(
           .json({ message: "E-mail e senha são obrigatórios" });
       }
 
+      // Try legacy users first
       const user = await storage.getUserByEmail(email);
-      if (!user) {
-        return res.status(401).json({ message: "E-mail ou senha incorretos" });
-      }
-
-      if (!user.password) {
-        return res
-          .status(401)
-          .json({ message: "Esta conta não possui senha cadastrada" });
-      }
-
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ message: "E-mail ou senha incorretos" });
-      }
-
-      // Create session for local user with expires_at for compatibility with isAuthenticated
-      const sessionExpiry = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 1 week
-      const sessionUser = {
-        claims: { sub: user.id },
-        expires_at: sessionExpiry,
-        isLocalAuth: true,
-      };
-
-      req.login(sessionUser, (err: any) => {
-        if (err) {
-          console.error("Login error:", err);
-          return res.status(500).json({ message: "Erro ao fazer login" });
+      if (user) {
+        if (!user.password) {
+          return res
+            .status(401)
+            .json({ message: "Esta conta não possui senha cadastrada" });
         }
-        res.json({ message: "Login realizado com sucesso", user });
-      });
+
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        if (!isValidPassword) {
+          return res.status(401).json({ message: "E-mail ou senha incorretos" });
+        }
+
+        const sessionExpiry = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+        const sessionUser = {
+          claims: { sub: user.id },
+          expires_at: sessionExpiry,
+          isLocalAuth: true,
+          isB2bUser: false,
+        };
+
+        return req.login(sessionUser, (err: any) => {
+          if (err) {
+            console.error("Login error:", err);
+            return res.status(500).json({ message: "Erro ao fazer login" });
+          }
+          res.json({ message: "Login realizado com sucesso", user });
+        });
+      }
+
+      // Try B2B users
+      const [b2bUser] = await db.select().from(b2bUsers).where(eq(b2bUsers.email, email));
+      if (b2bUser) {
+        if (!b2bUser.senhaHash) {
+          return res
+            .status(401)
+            .json({ message: "Esta conta não possui senha cadastrada" });
+        }
+
+        if (!b2bUser.ativo) {
+          return res.status(401).json({ message: "Conta desativada" });
+        }
+
+        const isValidPassword = await bcrypt.compare(password, b2bUser.senhaHash);
+        if (!isValidPassword) {
+          return res.status(401).json({ message: "E-mail ou senha incorretos" });
+        }
+
+        const sessionExpiry = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
+        const sessionUser = {
+          claims: { sub: b2bUser.id },
+          expires_at: sessionExpiry,
+          isLocalAuth: true,
+          isB2bUser: true,
+        };
+
+        return req.login(sessionUser, (err: any) => {
+          if (err) {
+            console.error("Login error:", err);
+            return res.status(500).json({ message: "Erro ao fazer login" });
+          }
+          res.json({ message: "Login realizado com sucesso", user: b2bUser });
+        });
+      }
+
+      return res.status(401).json({ message: "E-mail ou senha incorretos" });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ message: "Erro ao fazer login" });
@@ -233,12 +271,27 @@ export async function registerRoutes(
     });
   });
 
-  // Auth routes
+  // Auth routes - supports both legacy users and B2B users
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const isB2bUser = req.user.isB2bUser;
+
+      if (isB2bUser) {
+        const [b2bUser] = await db.select().from(b2bUsers).where(eq(b2bUsers.id, userId));
+        if (!b2bUser) {
+          return res.status(404).json({ message: "Usuário não encontrado" });
+        }
+        const isSuperAdmin = await checkIsSuperAdmin(userId);
+        res.json({ ...b2bUser, isSuperAdmin, isB2bUser: true });
+      } else {
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: "Usuário não encontrado" });
+        }
+        const isSuperAdmin = await checkIsSuperAdmin(userId);
+        res.json({ ...user, isSuperAdmin, isB2bUser: false });
+      }
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -4739,6 +4792,84 @@ export async function registerRoutes(
         res.status(204).send();
       } catch (error) {
         res.status(500).json({ message: "Failed to delete integration" });
+      }
+    },
+  );
+
+  /* =========================================================
+     SUPER ADMIN ROUTES - Global System Management
+     Apenas usuários com isSuperAdmin = true podem acessar
+  ========================================================= */
+
+  app.get(
+    "/api/superadmin/companies",
+    isAuthenticated,
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const companies = await companiesService.getAllCompanies();
+        res.json(companies);
+      } catch (error) {
+        console.error("Error fetching all companies:", error);
+        res.status(500).json({ message: "Erro ao buscar empresas" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/superadmin/companies/:id",
+    isAuthenticated,
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const company = await companiesService.getCompanyById(req.params.id);
+        if (!company) {
+          return res.status(404).json({ message: "Empresa não encontrada" });
+        }
+        res.json(company);
+      } catch (error) {
+        console.error("Error fetching company:", error);
+        res.status(500).json({ message: "Erro ao buscar empresa" });
+      }
+    },
+  );
+
+  app.patch(
+    "/api/superadmin/companies/:id/approval",
+    isAuthenticated,
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const { approvalStatus } = req.body;
+        if (!approvalStatus) {
+          return res.status(400).json({ message: "Status de aprovação é obrigatório" });
+        }
+        const updated = await companiesService.updateCompanyApprovalStatus(
+          req.params.id,
+          approvalStatus
+        );
+        if (!updated) {
+          return res.status(404).json({ message: "Empresa não encontrada" });
+        }
+        res.json(updated);
+      } catch (error) {
+        console.error("Error updating company approval:", error);
+        res.status(500).json({ message: "Erro ao atualizar status" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/superadmin/b2b-users",
+    isAuthenticated,
+    requireSuperAdmin,
+    async (req, res) => {
+      try {
+        const users = await db.select().from(b2bUsers);
+        res.json(users);
+      } catch (error) {
+        console.error("Error fetching b2b users:", error);
+        res.status(500).json({ message: "Erro ao buscar usuários B2B" });
       }
     },
   );
