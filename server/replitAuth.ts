@@ -8,11 +8,7 @@ import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
 function getIssuerUrl() {
-  const replId = process.env.REPL_ID;
-  if (!replId) {
-    return null;
-  }
-  return `https://replit.com/oidc/${replId}`;
+  return process.env.ISSUER_URL || null;
 }
 
 const getOidcConfig = memoize(
@@ -24,10 +20,10 @@ const getOidcConfig = memoize(
     try {
       return await client.discovery(
         new URL(issuerUrl),
-        process.env.REPLIT_DOMAINS?.split(",")[0] || ""
+        process.env.CLIENT_ID || ""
       );
     } catch (error) {
-      console.warn("Replit Auth OIDC discovery failed, local auth only:", (error as Error).message);
+      console.warn("Auth OIDC discovery failed, local auth only:", (error as Error).message);
       return null;
     }
   },

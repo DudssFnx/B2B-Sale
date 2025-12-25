@@ -1,0 +1,175 @@
+🧩 PROMPT FINAL — REFATORAÇÃO CONTROLADA (USE ESSE TEXTO)
+
+Refatore este projeto para que funcione exatamente igual nos seguintes ambientes:
+
+Local (Vite)
+
+Replit
+
+Vercel (produção)
+
+O objetivo é eliminar qualquer dependência implícita do ambiente Replit, sem alterar regras de negócio ou comportamento do sistema.
+
+🔒 REGRAS ABSOLUTAS (NÃO MEXER)
+
+NÃO alterar o banco de dados configurado no Railway
+
+Manter o mesmo provider
+
+Manter as mesmas variáveis de ambiente
+
+Manter a mesma estrutura de conexão
+
+NÃO alterar:
+
+lógica de autenticação
+
+lógica de carrinho
+
+lógica de pedidos
+
+contratos da API
+
+schema do banco
+
+NÃO mudar regras de negócio
+
+NÃO trocar bibliotecas
+
+🗄️ BANCO DE DADOS (RAILWAY)
+
+Preservar 100% da conexão com o banco no Railway
+
+Garantir que a aplicação use somente variáveis de ambiente padrão, compatíveis com:
+
+Local (.env)
+
+Replit (Secrets)
+
+Vercel (Environment Variables)
+
+Usar apenas:
+
+process.env.DATABASE_URL
+
+
+ou
+
+import.meta.env.VITE_*
+
+
+conforme o contexto (backend ou frontend)
+
+❌ Não usar variáveis específicas do Replit (REPLIT_*)
+
+🖼️ ASSETS E IMAGENS (CRÍTICO)
+
+Refatorar TODAS as imagens, logos e banners para ES Module Imports
+
+❌ Não permitido:
+
+<img src="/logo.png" />
+<img src="/banner1.png" />
+
+
+✅ Obrigatório:
+
+import logoImage from "@/assets/logo.png";
+import bannerImage1 from "@/assets/banner-1.png";
+
+<img src={logoImage} />
+
+
+Centralizar todos os assets em:
+
+src/assets/
+
+
+Adicionar fallback visual para imagens importantes (logo, banners), para evitar tela vazia caso o asset não carregue:
+
+{bannerImage ? (
+  <img src={bannerImage} />
+) : (
+  <div className="h-full w-full bg-gradient-to-r from-orange-500 to-red-500" />
+)}
+
+🎨 TAILWIND / CSS
+
+Garantir que 100% dos estilos venham apenas de:
+
+Tailwind
+
+index.css
+
+@layer base | components | utilities
+
+Eliminar qualquer:
+
+CSS implícito do ambiente Replit
+
+estilo global fora do Tailwind
+
+Validar que todas as classes usadas no JSX existem:
+
+no Tailwind
+
+ou estão definidas via @layer
+
+Corrigir tailwind.config.ts para conter explicitamente:
+
+content: [
+  "./index.html",
+  "./src/**/*.{js,ts,jsx,tsx}"
+]
+
+⚙️ VARIÁVEIS DE AMBIENTE
+
+Frontend: usar apenas
+
+import.meta.env.VITE_*
+
+
+Backend: usar apenas
+
+process.env.*
+
+
+Garantir compatibilidade com:
+
+.env local
+
+Replit Secrets
+
+Vercel Environment Variables
+
+🏗️ BUILD E DEPLOY
+
+O projeto PRECISA:
+
+rodar com npm run dev
+
+buildar com npm run build
+
+rodar com npm run preview
+
+O build não pode gerar erros nem warnings críticos
+
+O resultado visual deve ser idêntico entre:
+
+Replit
+
+Local
+
+Vercel
+
+🎯 OBJETIVO FINAL
+
+Layout idêntico em todos os ambientes
+
+Nenhuma dependência oculta do Replit
+
+Banco Railway intacto
+
+Código mais previsível, portável e profissional
+
+Não faça mudanças fora desses critérios.
