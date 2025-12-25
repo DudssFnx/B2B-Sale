@@ -7,13 +7,29 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
+function getIssuerUrl() {
+  const replId = process.env.REPL_ID;
+  if (!replId) {
+    return null;
+  }
+  return `https://replit.com/oidc/${replId}`;
+}
+
 const getOidcConfig = memoize(
   async () => {
-    // Alterar para o ISSUER_URL do Vercel
-    return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://vercel.com/oidc"), // Exemplo de URL de autenticação OAuth2 do Vercel
-      process.env.CLIENT_ID!  // Verifique se está usando a variável CLIENT_ID correta
-    );
+    const issuerUrl = getIssuerUrl();
+    if (!issuerUrl) {
+      return null;
+    }
+    try {
+      return await client.discovery(
+        new URL(issuerUrl),
+        process.env.REPLIT_DOMAINS?.split(",")[0] || ""
+      );
+    } catch (error) {
+      console.warn("Replit Auth OIDC discovery failed, local auth only:", (error as Error).message);
+      return null;
+    }
   },
   { maxAge: 3600 * 1000 }
 );
@@ -28,13 +44,13 @@ export function getSession() {
     tableName: "sessions",
   });
   return session({
-    secret: process.env.SESSION_SECRET!,
+    secret: process.env.SESSION_SECRET || "fallback-secret-change-me",
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,  // Configurar como `true` se usar HTTPS, caso contrário, `false`
+      secure: process.env.NODE_ENV === "production",
       maxAge: sessionTtl,
     },
   });
@@ -67,6 +83,29 @@ export async function setupAuth(app: Express) {
   app.use(passport.session());
 
   const config = await getOidcConfig();
+  
+  if (!config) {
+    console.log("Replit Auth not available (REPL_ID not set). OAuth routes will be disabled, but local auth will work.");
+    
+    passport.serializeUser((user: Express.User, cb) => cb(null, user));
+    passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+    
+    app.get("/api/login", (_req, res) => {
+      res.redirect("/auth");
+    });
+
+    app.get("/api/callback", (_req, res) => {
+      res.redirect("/");
+    });
+
+    app.get("/api/logout", (req, res) => {
+      req.logout(() => {
+        res.redirect("/");
+      });
+    });
+    
+    return;
+  }
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
@@ -81,14 +120,14 @@ export async function setupAuth(app: Express) {
   const registeredStrategies = new Set<string>();
 
   const ensureStrategy = (domain: string) => {
-    const strategyName = `vercelauth:${domain}`;
+    const strategyName = `replitauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
       const strategy = new Strategy(
         {
           name: strategyName,
           config,
           scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`, // Alterar para o domínio correto
+          callbackURL: `https://${domain}/api/callback`,
         },
         verify,
       );
@@ -102,7 +141,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`vercelauth:${req.hostname}`, {
+    passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
@@ -110,7 +149,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/callback", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`vercelauth:${req.hostname}`, {
+    passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
@@ -120,7 +159,7 @@ export async function setupAuth(app: Express) {
     req.logout(() => {
       res.redirect(
         client.buildEndSessionUrl(config, {
-          client_id: process.env.CLIENT_ID!, // Usar CLIENT_ID do Vercel
+          client_id: process.env.REPLIT_DOMAINS?.split(",")[0] || "",
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
         }).href
       );
@@ -148,6 +187,9 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
 
   try {
     const config = await getOidcConfig();
+    if (!config) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
     const tokenResponse = await client.refreshTokenGrant(config, refreshToken);
     updateUserSession(user, tokenResponse);
     return next();
