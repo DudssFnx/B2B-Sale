@@ -1,6 +1,5 @@
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
-
 import passport from "passport";
 import session from "express-session";
 import type { Express, RequestHandler } from "express";
@@ -10,9 +9,10 @@ import { storage } from "./storage";
 
 const getOidcConfig = memoize(
   async () => {
+    // Alterar para o ISSUER_URL do Vercel
     return await client.discovery(
-      new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
-      process.env.REPL_ID!
+      new URL(process.env.ISSUER_URL ?? "https://vercel.com/oidc"), // Exemplo de URL de autenticação OAuth2 do Vercel
+      process.env.CLIENT_ID!  // Verifique se está usando a variável CLIENT_ID correta
     );
   },
   { maxAge: 3600 * 1000 }
@@ -34,7 +34,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: true,
+      secure: true,  // Configurar como `true` se usar HTTPS, caso contrário, `false`
       maxAge: sessionTtl,
     },
   });
@@ -81,14 +81,14 @@ export async function setupAuth(app: Express) {
   const registeredStrategies = new Set<string>();
 
   const ensureStrategy = (domain: string) => {
-    const strategyName = `replitauth:${domain}`;
+    const strategyName = `vercelauth:${domain}`;
     if (!registeredStrategies.has(strategyName)) {
       const strategy = new Strategy(
         {
           name: strategyName,
           config,
           scope: "openid email profile offline_access",
-          callbackURL: `https://${domain}/api/callback`,
+          callbackURL: `https://${domain}/api/callback`, // Alterar para o domínio correto
         },
         verify,
       );
@@ -102,7 +102,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/login", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    passport.authenticate(`vercelauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
@@ -110,7 +110,7 @@ export async function setupAuth(app: Express) {
 
   app.get("/api/callback", (req, res, next) => {
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
+    passport.authenticate(`vercelauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
       failureRedirect: "/api/login",
     })(req, res, next);
@@ -120,7 +120,7 @@ export async function setupAuth(app: Express) {
     req.logout(() => {
       res.redirect(
         client.buildEndSessionUrl(config, {
-          client_id: process.env.REPL_ID!,
+          client_id: process.env.CLIENT_ID!, // Usar CLIENT_ID do Vercel
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
         }).href
       );

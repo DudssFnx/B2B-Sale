@@ -1,26 +1,72 @@
 import { type Express } from "express";
 import { type Server } from "http";
-import { storage } from "./storage";
+
+// ================================
+// CORE
+// ================================
 import { db } from "./db";
-import { products, orderItems, orders, b2bUsers } from "@shared/schema";
-import { eq, sql } from "drizzle-orm";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { storage } from "./storage";
+
+// ================================
+// SCHEMAS / DB
+// ================================
 import {
-  insertCategorySchema,
-  insertProductSchema,
-  insertCouponSchema,
+  b2bUsers,
+  orderItems,
+  orders,
+  products,
+} from "@shared/schema";
+import { eq, sql } from "drizzle-orm";
+
+// ================================
+// AUTH (LEGACY - REPLIT)
+// ⚠️ NÃO USAR EM ROTAS NOVAS
+// ================================
+import { isAuthenticated, setupAuth } from "./replitAuth";
+
+// ================================
+// AUTH (JWT - NOVO)
+// ================================
+import authRoutes from "./routes/auth.routes";
+// depois entra:
+// import { requireAuth } from "./middleware/requireAuth";
+
+// ================================
+// VALIDATION
+// ================================
+import {
   insertCatalogBannerSchema,
   insertCatalogSlideSchema,
+  insertCategorySchema,
+  insertCouponSchema,
+  insertProductSchema,
   insertSupplierSchema,
 } from "@shared/schema";
 import { z } from "zod";
-import multer from "multer";
+
+// ================================
+// UPLOAD / FILES
+// ================================
 import { Client } from "@replit/object-storage";
+import multer from "multer";
+
+// ================================
+// SERVICES
+// ================================
 import * as blingService from "./services/bling";
+import * as companiesService from "./services/companies.service";
+
+// ================================
+// SECURITY / UTILS
+// ================================
 import bcrypt from "bcryptjs";
 import PDFDocument from "pdfkit";
-import { requireSuperAdmin, checkIsSuperAdmin } from "./middleware/superAdmin";
-import * as companiesService from "./services/companies.service";
+
+// ================================
+// MIDDLEWARES
+// ================================
+import { checkIsSuperAdmin, requireSuperAdmin } from "./middleware/superAdmin";
+
 
 /* =========================================================
    SINGLE AND CORRECT registerRoutes
@@ -4911,6 +4957,9 @@ export async function registerRoutes(
       }
     },
   );
+
+  app.use("/api/auth", authRoutes);
+
 
   return httpServer;
 }

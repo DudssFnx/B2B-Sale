@@ -1,10 +1,12 @@
-import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
-import { serveStatic } from "./static";
+import "dotenv/config";
+
+import express, { NextFunction, type Request, Response } from "express";
 import { createServer } from "http";
-import { initializeBlingTokens } from "./services/bling";
 import { pool } from "./db";
+import { registerRoutes } from "./routes";
 import { seedSuperAdmin } from "./scripts/seedSuperAdmin";
+import { initializeBlingTokens } from "./services/bling";
+import { serveStatic } from "./static";
 
 
 const app = express();
