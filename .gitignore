@@ -1,6 +1,25 @@
+# dependências
 node_modules
+
+# build
 dist
+build
+
+# env
+.env
+.env.*
+
+# sistema
 .DS_Store
-server/public
-vite.config.ts.*
+
+# vercel
+.vercel
+
+# arquivos temporários
 *.tar.gz
+
+# vite
+vite.config.ts.*
+
+# server
+server/public
