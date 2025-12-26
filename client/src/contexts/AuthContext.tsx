@@ -12,6 +12,7 @@ interface AuthContextType {
   isCustomer: boolean;
   isSupplier: boolean;
   isApproved: boolean;
+  isSuperAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isCustomer,
         isSupplier,
         isApproved,
+        isSuperAdmin,
       }}
     >
       {children}

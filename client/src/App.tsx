@@ -52,7 +52,9 @@ import AppearancePage from "@/pages/appearance";
 import SuppliersPage from "@/pages/suppliers";
 import PaymentsPage from "@/pages/payments";
 import StorePage from "@/pages/store";
+import SuperAdminDashboard from "@/pages/super-admin-dashboard";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 
 function CompanySelector() {
   const { activeCompany, companies, hasMultipleCompanies, setActiveCompany, isLoading } = useCompany();
@@ -94,7 +96,7 @@ function CompanySelector() {
 }
 
 function AuthenticatedApp() {
-  const { user, logout, isAdmin, isSupplier, isSales, isApproved } = useAuth();
+  const { user, logout, isAdmin, isSupplier, isSales, isApproved, isSuperAdmin } = useAuth();
   const { openCart, itemCount } = useCart();
 
   const displayName = user?.firstName && user?.lastName 
@@ -126,14 +128,17 @@ function AuthenticatedApp() {
 
   return (
     <SidebarProvider style={sidebarStyle as React.CSSProperties}>
-      <div className="flex h-screen w-full">
-        <AppSidebar
-          userRole={(user?.role as "admin" | "sales" | "customer" | "supplier") || "customer"}
-          userName={displayName}
-          onLogout={logout}
-        />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <header className="flex items-center justify-between gap-4 p-3 border-b bg-background sticky top-0 z-50">
+      <div className="flex h-screen w-full flex-col">
+        {isSuperAdmin && <ImpersonationBanner />}
+        <div className="flex flex-1 overflow-hidden">
+          <AppSidebar
+            userRole={(user?.role as "admin" | "sales" | "customer" | "supplier") || "customer"}
+            userName={displayName}
+            onLogout={logout}
+            isSuperAdmin={isSuperAdmin}
+          />
+          <div className="flex flex-col flex-1 overflow-hidden">
+            <header className="flex items-center justify-between gap-4 p-3 border-b bg-background sticky top-0 z-50">
             <div className="flex items-center gap-2">
               <SidebarTrigger data-testid="button-sidebar-toggle" />
               <CompanySelector />
@@ -175,13 +180,15 @@ function AuthenticatedApp() {
               {isAdmin && <Route path="/catalog-customization" component={CatalogCustomizationPage} />}
               {isAdmin && <Route path="/appearance" component={AppearancePage} />}
               {isAdmin && <Route path="/payments" component={PaymentsPage} />}
+              {isSuperAdmin && <Route path="/admin" component={SuperAdminDashboard} />}
               <Route path="/contas-receber" component={ContasReceberPage} />
               <Route path="/contas-pagar" component={ContasPagarPage} />
               <Route component={NotFound} />
             </Switch>
           </main>
+          </div>
+          <CartDrawer isAuthenticated={true} />
         </div>
-        <CartDrawer isAuthenticated={true} />
       </div>
     </SidebarProvider>
   );

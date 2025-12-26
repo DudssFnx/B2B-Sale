@@ -44,6 +44,7 @@ import {
   Sparkles,
   Tag,
   CreditCard,
+  Shield,
 } from "lucide-react";
 import logoImage from "@assets/image_1765659931449.png";
 
@@ -62,6 +63,7 @@ interface AppSidebarProps {
   userRole?: UserRole;
   userName?: string;
   onLogout?: () => void;
+  isSuperAdmin?: boolean;
 }
 
 const allMenuItems: MenuItem[] = [
@@ -112,7 +114,7 @@ const supplierMenuItems: MenuItem[] = [
   { title: "Marcas", url: "/brand-analytics", icon: Tag, moduleKey: "brands" },
 ];
 
-export function AppSidebar({ userRole = "customer", userName = "User", onLogout }: AppSidebarProps) {
+export function AppSidebar({ userRole = "customer", userName = "User", onLogout, isSuperAdmin = false }: AppSidebarProps) {
   const [location] = useLocation();
 
   const { data: permissionsData } = useQuery<{ modules: string[]; role: string }>({
@@ -311,6 +313,33 @@ export function AppSidebar({ userRole = "customer", userName = "User", onLogout 
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        
+        {isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground px-2">
+              Super Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/admin"}
+                    className="group/btn rounded-lg"
+                    data-testid="link-nav-super-admin"
+                  >
+                    <Link href="/admin">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-500/10 group-hover/btn:bg-amber-500/20 transition-colors">
+                        <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <span className="font-medium">Painel Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-3 mt-auto">

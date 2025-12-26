@@ -1,6 +1,6 @@
 import { db } from "../db";
-import { companies, userCompanies } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { companies, userCompanies, orders } from "@shared/schema";
+import { eq, sql, desc, count } from "drizzle-orm";
 import type { InsertCompany } from "@shared/schema";
 
 /**
@@ -107,4 +107,68 @@ export async function updateCompanyApprovalStatus(
     .returning();
 
   return updated ?? null;
+}
+
+/**
+ * Métricas globais para SUPER_ADMIN dashboard
+ */
+export async function getGlobalMetrics() {
+  // Total de empresas
+  const [companyCount] = await db
+    .select({ count: count() })
+    .from(companies);
+  
+  // Empresas ativas
+  const [activeCount] = await db
+    .select({ count: count() })
+    .from(companies)
+    .where(eq(companies.ativo, true));
+  
+  // Total de pedidos
+  const [orderCount] = await db
+    .select({ count: count() })
+    .from(orders);
+  
+  // Faturamento total
+  const [revenue] = await db
+    .select({ 
+      total: sql<string>`COALESCE(SUM(CAST(${orders.total} AS DECIMAL)), 0)` 
+    })
+    .from(orders);
+  
+  return {
+    totalCompanies: companyCount?.count ?? 0,
+    activeCompanies: activeCount?.count ?? 0,
+    totalOrders: orderCount?.count ?? 0,
+    totalRevenue: parseFloat(revenue?.total ?? "0"),
+  };
+}
+
+/**
+ * Lista empresas com estatísticas para SUPER_ADMIN dashboard
+ * Nota: orders não tem companyId direto, então usamos a relação através de user_companies
+ */
+export async function getCompaniesWithStats() {
+  const companiesList = await db.select().from(companies).orderBy(desc(companies.createdAt));
+  
+  // Get order stats per company via user_companies join
+  const orderStats = await db
+    .select({
+      companyId: userCompanies.companyId,
+      orderCount: count(),
+      totalRevenue: sql<string>`COALESCE(SUM(CAST(${orders.total} AS DECIMAL)), 0)`,
+      lastOrderDate: sql<Date>`MAX(${orders.createdAt})`,
+    })
+    .from(orders)
+    .innerJoin(userCompanies, eq(orders.userId, userCompanies.userId))
+    .groupBy(userCompanies.companyId);
+  
+  const statsMap = new Map(orderStats.map(s => [s.companyId, s]));
+  
+  return companiesList.map(company => ({
+    ...company,
+    orderCount: statsMap.get(company.id)?.orderCount ?? 0,
+    totalRevenue: parseFloat(statsMap.get(company.id)?.totalRevenue ?? "0"),
+    lastActivity: statsMap.get(company.id)?.lastOrderDate ?? company.updatedAt ?? company.createdAt,
+  }));
 }

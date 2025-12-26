@@ -454,6 +454,96 @@ export async function registerRoutes(
     }
   });
 
+  // ========== SUPER_ADMIN DASHBOARD ==========
+  // Global metrics for SUPER_ADMIN dashboard
+  app.get("/api/superadmin/metrics", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const metrics = await companiesService.getGlobalMetrics();
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching global metrics:", error);
+      res.status(500).json({ message: "Erro ao buscar métricas globais" });
+    }
+  });
+
+  // Companies with stats for SUPER_ADMIN dashboard
+  app.get("/api/superadmin/companies", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const companiesWithStats = await companiesService.getCompaniesWithStats();
+      res.json(companiesWithStats);
+    } catch (error) {
+      console.error("Error fetching companies with stats:", error);
+      res.status(500).json({ message: "Erro ao buscar empresas com estatísticas" });
+    }
+  });
+
+  // Impersonate a company (enter as company)
+  app.post("/api/superadmin/impersonate/:companyId", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const company = await companiesService.getCompanyById(companyId);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Empresa não encontrada" });
+      }
+      
+      // Set the active company in session
+      if (req.session) {
+        req.session.activeCompanyId = companyId;
+        req.session.isImpersonating = true;
+        req.session.impersonatedCompanyName = company.nomeFantasia || company.razaoSocial;
+      }
+      
+      res.json({ 
+        message: "Entrou como empresa",
+        company: {
+          id: company.id,
+          name: company.nomeFantasia || company.razaoSocial,
+          slug: company.slug,
+        }
+      });
+    } catch (error) {
+      console.error("Error impersonating company:", error);
+      res.status(500).json({ message: "Erro ao entrar como empresa" });
+    }
+  });
+
+  // Exit impersonation mode
+  app.post("/api/superadmin/exit-impersonate", isAuthenticated, requireSuperAdmin, async (req: any, res) => {
+    try {
+      if (req.session) {
+        delete req.session.activeCompanyId;
+        delete req.session.isImpersonating;
+        delete req.session.impersonatedCompanyName;
+      }
+      
+      res.json({ message: "Saiu do modo empresa" });
+    } catch (error) {
+      console.error("Error exiting impersonation:", error);
+      res.status(500).json({ message: "Erro ao sair do modo empresa" });
+    }
+  });
+
+  // Get current impersonation status
+  app.get("/api/superadmin/impersonation-status", isAuthenticated, async (req: any, res) => {
+    try {
+      const isSuperAdmin = await isSuperAdminReq(req);
+      
+      if (!isSuperAdmin) {
+        return res.json({ isImpersonating: false });
+      }
+      
+      res.json({
+        isImpersonating: req.session?.isImpersonating || false,
+        companyId: req.session?.activeCompanyId || null,
+        companyName: req.session?.impersonatedCompanyName || null,
+      });
+    } catch (error) {
+      console.error("Error fetching impersonation status:", error);
+      res.status(500).json({ message: "Erro ao buscar status de impersonation" });
+    }
+  });
+
   // ========== CATEGORIES ==========
   app.get("/api/categories", isAuthenticated, isApproved, async (req: any, res) => {
     try {
