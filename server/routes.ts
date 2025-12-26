@@ -525,6 +525,143 @@ export async function registerRoutes(
     }
   });
 
+  // ========== PUBLIC STORE BY SLUG (MULTI-TENANT) ==========
+  app.get("/api/public/store/:slug", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await companiesService.getCompanyBySlug(slug);
+      
+      if (!company) {
+        return res.status(404).json({ message: "Loja não encontrada" });
+      }
+      
+      if (!company.ativo) {
+        return res.status(403).json({ message: "Loja inativa" });
+      }
+      
+      res.json({
+        id: company.id,
+        slug: company.slug,
+        nomeFantasia: company.nomeFantasia,
+        razaoSocial: company.razaoSocial,
+        cidade: company.cidade,
+        estado: company.estado,
+        telefone: company.telefone,
+        email: company.email,
+      });
+    } catch (error) {
+      console.error("Error fetching store:", error);
+      res.status(500).json({ message: "Failed to fetch store" });
+    }
+  });
+
+  app.get("/api/public/store/:slug/products", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await companiesService.getCompanyBySlug(slug);
+      
+      if (!company || !company.ativo) {
+        return res.status(404).json({ message: "Loja não encontrada" });
+      }
+      
+      const categoryId = req.query.categoryId
+        ? parseInt(req.query.categoryId as string)
+        : undefined;
+      const search = req.query.search as string | undefined;
+      const page = req.query.page ? parseInt(req.query.page as string) : 1;
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
+      
+      const result = await storage.getProductsByCompany(company.id, {
+        categoryId,
+        search,
+        page,
+        limit,
+      });
+      
+      const productsWithRetailPrice = result.products.map((p) => ({
+        ...p,
+        price: (parseFloat(p.price) * (1 + RETAIL_MARKUP)).toFixed(2),
+      }));
+      
+      res.json({
+        ...result,
+        products: productsWithRetailPrice,
+      });
+    } catch (error) {
+      console.error("Error fetching store products:", error);
+      res.status(500).json({ message: "Failed to fetch products" });
+    }
+  });
+
+  app.get("/api/public/store/:slug/categories", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await companiesService.getCompanyBySlug(slug);
+      
+      if (!company || !company.ativo) {
+        return res.status(404).json({ message: "Loja não encontrada" });
+      }
+      
+      const categories = await storage.getCategoriesByCompany(company.id);
+      const publicCategories = categories.filter((c) => !c.hideFromVarejo);
+      res.json(publicCategories);
+    } catch (error) {
+      console.error("Error fetching store categories:", error);
+      res.status(500).json({ message: "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/public/store/:slug/banners", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await companiesService.getCompanyBySlug(slug);
+      
+      if (!company || !company.ativo) {
+        return res.status(404).json({ message: "Loja não encontrada" });
+      }
+      
+      const banners = await storage.getCatalogBannersByCompany(company.id);
+      res.json(banners);
+    } catch (error) {
+      console.error("Error fetching store banners:", error);
+      res.status(500).json({ message: "Failed to fetch banners" });
+    }
+  });
+
+  app.get("/api/public/store/:slug/slides", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await companiesService.getCompanyBySlug(slug);
+      
+      if (!company || !company.ativo) {
+        return res.status(404).json({ message: "Loja não encontrada" });
+      }
+      
+      const slides = await storage.getCatalogSlidesByCompany(company.id);
+      res.json(slides);
+    } catch (error) {
+      console.error("Error fetching store slides:", error);
+      res.status(500).json({ message: "Failed to fetch slides" });
+    }
+  });
+
+  app.get("/api/public/store/:slug/settings", async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const company = await companiesService.getCompanyBySlug(slug);
+      
+      if (!company || !company.ativo) {
+        return res.status(404).json({ message: "Loja não encontrada" });
+      }
+      
+      const settings = await storage.getSiteSettingsByCompany(company.id);
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching store settings:", error);
+      res.status(500).json({ message: "Failed to fetch settings" });
+    }
+  });
+
   // ========== PRODUCTS ==========
   app.get(
     "/api/products",

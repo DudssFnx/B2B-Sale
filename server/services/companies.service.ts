@@ -74,6 +74,18 @@ export async function getCompanyById(companyId: string) {
 }
 
 /**
+ * Busca empresa por slug (catálogo público)
+ */
+export async function getCompanyBySlug(slug: string) {
+  const [company] = await db
+    .select()
+    .from(companies)
+    .where(eq(companies.slug, slug));
+
+  return company ?? null;
+}
+
+/**
  * Lista TODAS as empresas (apenas SUPER_ADMIN)
  */
 export async function getAllCompanies() {

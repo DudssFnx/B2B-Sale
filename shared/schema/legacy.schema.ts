@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, integer, decimal, boolean, timestamp, serial, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { companies } from "./companies.schema";
 
 // Session storage table - mandatory for Replit Auth
 export const sessions = pgTable(
@@ -62,8 +63,9 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 // Categories table with hierarchy support (parent/child)
 export const categories = pgTable("categories", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
+  slug: text("slug").notNull(),
   parentId: integer("parent_id"),
   hideFromVarejo: boolean("hide_from_varejo").notNull().default(false),
   blingId: integer("bling_id"),
@@ -108,8 +110,9 @@ export type Supplier = typeof suppliers.$inferSelect;
 // Products table
 export const products = pgTable("products", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
-  sku: text("sku").notNull().unique(),
+  sku: text("sku").notNull(),
   categoryId: integer("category_id").references(() => categories.id),
   supplierId: integer("supplier_id").references(() => suppliers.id),
   brand: text("brand"),
@@ -233,6 +236,7 @@ export type OrderItem = typeof orderItems.$inferSelect;
 // Customer Price Tables - Personalized pricing per customer (like Mercos)
 export const priceTables = pgTable("price_tables", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   discountPercent: decimal("discount_percent", { precision: 5, scale: 2 }).default("0"),
@@ -251,6 +255,7 @@ export type PriceTable = typeof priceTables.$inferSelect;
 // Customer-specific product prices
 export const customerPrices = pgTable("customer_prices", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   productId: integer("product_id").notNull().references(() => products.id),
   customPrice: decimal("custom_price", { precision: 10, scale: 2 }).notNull(),
@@ -266,7 +271,8 @@ export type CustomerPrice = typeof customerPrices.$inferSelect;
 // Coupons and promotions (like Mercos)
 export const coupons = pgTable("coupons", {
   id: serial("id").primaryKey(),
-  code: text("code").notNull().unique(),
+  companyId: varchar("company_id").references(() => companies.id),
+  code: text("code").notNull(),
   name: text("name").notNull(),
   discountType: text("discount_type").notNull().default("percent"), // percent, fixed
   discountValue: decimal("discount_value", { precision: 10, scale: 2 }).notNull(),
@@ -312,7 +318,8 @@ export type AgendaEvent = typeof agendaEvents.$inferSelect;
 // Site settings for global configurations
 export const siteSettings = pgTable("site_settings", {
   id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
+  companyId: varchar("company_id").references(() => companies.id),
+  key: text("key").notNull(),
   value: text("value"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -322,6 +329,7 @@ export type SiteSetting = typeof siteSettings.$inferSelect;
 // Catalog banners for customization
 export const catalogBanners = pgTable("catalog_banners", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   position: text("position").notNull(), // hero, promo1, promo2, promo3, footer
   title: text("title"),
   subtitle: text("subtitle"),
@@ -349,6 +357,7 @@ export type CatalogBanner = typeof catalogBanners.$inferSelect;
 // Catalog carousel slides (hero slider)
 export const catalogSlides = pgTable("catalog_slides", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   title: text("title"),
   subtitle: text("subtitle"),
   buttonText: text("button_text"),
@@ -371,7 +380,8 @@ export type CatalogSlide = typeof catalogSlides.$inferSelect;
 // Catalog customization settings
 export const catalogConfig = pgTable("catalog_config", {
   id: serial("id").primaryKey(),
-  key: text("key").notNull().unique(),
+  companyId: varchar("company_id").references(() => companies.id),
+  key: text("key").notNull(),
   value: text("value"),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

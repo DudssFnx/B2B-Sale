@@ -166,6 +166,13 @@ export interface IStorage {
   getCatalogConfig(key: string): Promise<CatalogConfig | undefined>;
   setCatalogConfig(key: string, value: string): Promise<CatalogConfig>;
 
+  // Multi-tenant (by company)
+  getProductsByCompany(companyId: string, filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
+  getCategoriesByCompany(companyId: string): Promise<Category[]>;
+  getCatalogBannersByCompany(companyId: string): Promise<CatalogBanner[]>;
+  getCatalogSlidesByCompany(companyId: string): Promise<CatalogSlide[]>;
+  getSiteSettingsByCompany(companyId: string): Promise<SiteSetting[]>;
+
   // Customer Credits (Fiado)
   getCustomerCredits(userId: string): Promise<CustomerCredit[]>;
   getAllCredits(): Promise<CustomerCredit[]>;
@@ -2761,6 +2768,66 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  // ========== MULTI-TENANT (BY COMPANY) ==========
+  async getProductsByCompany(companyId: string, filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 50;
+    const offset = (page - 1) * limit;
+
+    let conditions = [eq(products.companyId, companyId)];
+    
+    if (filters?.categoryId) {
+      conditions.push(eq(products.categoryId, filters.categoryId));
+    }
+    
+    if (filters?.search) {
+      conditions.push(
+        or(
+          ilike(products.name, `%${filters.search}%`),
+          ilike(products.sku, `%${filters.search}%`)
+        )!
+      );
+    }
+
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const [countResult] = await db.select({ count: count() }).from(products).where(whereClause);
+    const total = countResult?.count || 0;
+
+    const productsList = await db.select().from(products)
+      .where(whereClause)
+      .limit(limit)
+      .offset(offset)
+      .orderBy(desc(products.createdAt));
+
+    return {
+      products: productsList,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  async getCategoriesByCompany(companyId: string): Promise<Category[]> {
+    return db.select().from(categories).where(eq(categories.companyId, companyId));
+  }
+
+  async getCatalogBannersByCompany(companyId: string): Promise<CatalogBanner[]> {
+    return db.select().from(catalogBanners)
+      .where(and(eq(catalogBanners.companyId, companyId), eq(catalogBanners.active, true)))
+      .orderBy(catalogBanners.order);
+  }
+
+  async getCatalogSlidesByCompany(companyId: string): Promise<CatalogSlide[]> {
+    return db.select().from(catalogSlides)
+      .where(and(eq(catalogSlides.companyId, companyId), eq(catalogSlides.active, true)))
+      .orderBy(catalogSlides.order);
+  }
+
+  async getSiteSettingsByCompany(companyId: string): Promise<SiteSetting[]> {
+    return db.select().from(siteSettings).where(eq(siteSettings.companyId, companyId));
   }
 
   // ========== CUSTOMER CREDITS (FIADO) ==========

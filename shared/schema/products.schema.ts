@@ -1,6 +1,7 @@
 import { pgTable, serial, varchar, text, decimal, boolean, timestamp, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { companies } from "./companies.schema";
 
 export const unidadeMedidaEnum = pgEnum("unidade_medida", ["UN", "CX", "KG", "MT", "PC", "LT"]);
 export const productStatusEnum = pgEnum("product_status", ["ATIVO", "INATIVO", "DESCONTINUADO"]);
@@ -8,8 +9,9 @@ export const disponibilidadeEnum = pgEnum("disponibilidade", ["DISPONIVEL", "IND
 
 export const b2bProducts = pgTable("b2b_products", {
   id: serial("id").primaryKey(),
+  companyId: varchar("company_id").references(() => companies.id),
   nome: text("nome").notNull(),
-  sku: varchar("sku", { length: 50 }).unique().notNull(),
+  sku: varchar("sku", { length: 50 }).notNull(),
   unidadeMedida: unidadeMedidaEnum("unidade_medida").notNull().default("UN"),
   precoVarejo: decimal("preco_varejo", { precision: 10, scale: 2 }).notNull(),
   precoAtacado: decimal("preco_atacado", { precision: 10, scale: 2 }).notNull(),

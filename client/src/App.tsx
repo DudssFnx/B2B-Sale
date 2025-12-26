@@ -43,6 +43,7 @@ import ContasPagarPage from "@/pages/contas-pagar";
 import AppearancePage from "@/pages/appearance";
 import SuppliersPage from "@/pages/suppliers";
 import PaymentsPage from "@/pages/payments";
+import StorePage from "@/pages/store";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 
 function AuthenticatedApp() {
@@ -154,6 +155,7 @@ function AppContent() {
           <Route path="/register" component={RegisterPage} />
           <Route path="/login" component={LoginPage} />
           <Route path="/catalogo" component={PublicCatalogPage} />
+          <Route path="/loja/:slug" component={StorePage} />
           <Route path="/checkout" component={CheckoutPage} />
           <Route component={LandingPage} />
         </Switch>
