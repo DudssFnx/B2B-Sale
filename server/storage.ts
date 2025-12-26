@@ -35,8 +35,9 @@ export interface IStorage {
   updateUser(id: string, user: Partial<InsertUser>): Promise<User | undefined>;
   deleteUser(id: string): Promise<boolean>;
 
-  // Categories
-  getCategories(): Promise<Category[]>;
+  // Categories - Multi-tenant: companyId required for tenant isolation
+  getCategories(companyId: string): Promise<Category[]>;
+  getAllCategories(): Promise<Category[]>; // For SUPER_ADMIN
   getCategory(id: number): Promise<Category | undefined>;
   getCategoryByBlingId(blingId: number): Promise<Category | undefined>;
   createCategory(category: InsertCategory): Promise<Category>;
@@ -50,16 +51,18 @@ export interface IStorage {
   updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
   deleteSupplier(id: number): Promise<boolean>;
 
-  // Products
-  getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
+  // Products - Multi-tenant: companyId required for tenant isolation
+  getProducts(companyId: string, filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
+  getAllProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>; // For SUPER_ADMIN
   getProduct(id: number): Promise<Product | undefined>;
   getProductBySku(sku: string): Promise<Product | undefined>;
   createProduct(product: InsertProduct): Promise<Product>;
   updateProduct(id: number, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: number): Promise<boolean>;
 
-  // Orders
-  getOrders(userId?: string): Promise<Order[]>;
+  // Orders - Multi-tenant: companyId required for tenant isolation
+  getOrders(companyId: string, userId?: string): Promise<Order[]>;
+  getAllOrders(userId?: string): Promise<Order[]>; // For SUPER_ADMIN
   getOrder(id: number): Promise<Order | undefined>;
   getOrderWithDetails(id: number): Promise<{
     order: Order;
@@ -93,22 +96,25 @@ export interface IStorage {
   getOrderItems(orderId: number): Promise<OrderItem[]>;
   createOrderItem(item: InsertOrderItem): Promise<OrderItem>;
 
-  // Price Tables
-  getPriceTables(): Promise<PriceTable[]>;
+  // Price Tables - Multi-tenant: companyId required for tenant isolation
+  getPriceTables(companyId: string): Promise<PriceTable[]>;
+  getAllPriceTables(): Promise<PriceTable[]>; // For SUPER_ADMIN
   getPriceTable(id: number): Promise<PriceTable | undefined>;
   createPriceTable(table: InsertPriceTable): Promise<PriceTable>;
   updatePriceTable(id: number, table: Partial<InsertPriceTable>): Promise<PriceTable | undefined>;
   deletePriceTable(id: number): Promise<boolean>;
 
-  // Customer Prices
-  getCustomerPrices(userId: string): Promise<CustomerPrice[]>;
+  // Customer Prices - Multi-tenant: companyId required for tenant isolation
+  getCustomerPrices(companyId: string, userId: string): Promise<CustomerPrice[]>;
+  getAllCustomerPrices(userId: string): Promise<CustomerPrice[]>; // For SUPER_ADMIN
   setCustomerPrice(price: InsertCustomerPrice): Promise<CustomerPrice>;
   deleteCustomerPrice(id: number): Promise<boolean>;
 
-  // Coupons
-  getCoupons(): Promise<Coupon[]>;
+  // Coupons - Multi-tenant: companyId required for tenant isolation
+  getCoupons(companyId: string): Promise<Coupon[]>;
+  getAllCoupons(): Promise<Coupon[]>; // For SUPER_ADMIN
   getCoupon(id: number): Promise<Coupon | undefined>;
-  getCouponByCode(code: string): Promise<Coupon | undefined>;
+  getCouponByCode(companyId: string, code: string): Promise<Coupon | undefined>;
   createCoupon(coupon: InsertCoupon): Promise<Coupon>;
   updateCoupon(id: number, coupon: Partial<InsertCoupon>): Promise<Coupon | undefined>;
   deleteCoupon(id: number): Promise<boolean>;
@@ -137,36 +143,39 @@ export interface IStorage {
   // Stage Management
   updateOrderStage(orderId: number, stage: string): Promise<{ success: boolean; error?: string }>;
 
-  // Agenda Events
-  getAgendaEvents(filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]>;
+  // Agenda Events - Multi-tenant: companyId required for tenant isolation
+  getAgendaEvents(companyId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]>;
+  getAllAgendaEvents(filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]>; // For SUPER_ADMIN
   getAgendaEvent(id: number): Promise<AgendaEvent | undefined>;
   createAgendaEvent(event: InsertAgendaEvent): Promise<AgendaEvent>;
   updateAgendaEvent(id: number, event: Partial<InsertAgendaEvent>): Promise<AgendaEvent | undefined>;
   deleteAgendaEvent(id: number): Promise<boolean>;
 
-  // Site Settings
-  getSiteSetting(key: string): Promise<SiteSetting | undefined>;
-  setSiteSetting(key: string, value: string): Promise<SiteSetting>;
+  // Site Settings - Multi-tenant: companyId required for tenant isolation
+  getSiteSetting(companyId: string, key: string): Promise<SiteSetting | undefined>;
+  setSiteSetting(companyId: string, key: string, value: string): Promise<SiteSetting>;
 
-  // Catalog Banners
-  getCatalogBanners(position?: string): Promise<CatalogBanner[]>;
+  // Catalog Banners - Multi-tenant: companyId required for tenant isolation
+  getCatalogBanners(companyId: string, position?: string): Promise<CatalogBanner[]>;
+  getAllCatalogBanners(position?: string): Promise<CatalogBanner[]>; // For SUPER_ADMIN
   getCatalogBanner(id: number): Promise<CatalogBanner | undefined>;
   createCatalogBanner(banner: InsertCatalogBanner): Promise<CatalogBanner>;
   updateCatalogBanner(id: number, banner: Partial<InsertCatalogBanner>): Promise<CatalogBanner | undefined>;
   deleteCatalogBanner(id: number): Promise<boolean>;
 
-  // Catalog Slides
-  getCatalogSlides(): Promise<CatalogSlide[]>;
+  // Catalog Slides - Multi-tenant: companyId required for tenant isolation
+  getCatalogSlides(companyId: string): Promise<CatalogSlide[]>;
+  getAllCatalogSlides(): Promise<CatalogSlide[]>; // For SUPER_ADMIN
   getCatalogSlide(id: number): Promise<CatalogSlide | undefined>;
   createCatalogSlide(slide: InsertCatalogSlide): Promise<CatalogSlide>;
   updateCatalogSlide(id: number, slide: Partial<InsertCatalogSlide>): Promise<CatalogSlide | undefined>;
   deleteCatalogSlide(id: number): Promise<boolean>;
 
-  // Catalog Config
-  getCatalogConfig(key: string): Promise<CatalogConfig | undefined>;
-  setCatalogConfig(key: string, value: string): Promise<CatalogConfig>;
+  // Catalog Config - Multi-tenant: companyId required for tenant isolation
+  getCatalogConfig(companyId: string, key: string): Promise<CatalogConfig | undefined>;
+  setCatalogConfig(companyId: string, key: string, value: string): Promise<CatalogConfig>;
 
-  // Multi-tenant (by company)
+  // Multi-tenant (by company) - Legacy methods kept for backwards compatibility
   getProductsByCompany(companyId: string, filters?: { categoryId?: number; search?: string; page?: number; limit?: number }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }>;
   getCategoriesByCompany(companyId: string): Promise<Category[]>;
   getCatalogBannersByCompany(companyId: string): Promise<CatalogBanner[]>;
@@ -637,8 +646,12 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Categories
-  async getCategories(): Promise<Category[]> {
+  // Categories - Multi-tenant
+  async getCategories(companyId: string): Promise<Category[]> {
+    return db.select().from(categories).where(eq(categories.companyId, companyId));
+  }
+
+  async getAllCategories(): Promise<Category[]> {
     return db.select().from(categories);
   }
 
@@ -692,8 +705,39 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Products
-  async getProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
+  // Products - Multi-tenant
+  async getProducts(companyId: string, filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 50;
+    const offset = (page - 1) * limit;
+    
+    const conditions = [eq(products.companyId, companyId)];
+    if (filters?.categoryId) {
+      conditions.push(eq(products.categoryId, filters.categoryId));
+    }
+    if (filters?.search) {
+      conditions.push(
+        or(
+          ilike(products.name, `%${filters.search}%`),
+          ilike(products.sku, `%${filters.search}%`),
+          ilike(products.brand, `%${filters.search}%`)
+        )!
+      );
+    }
+
+    const orderByClause = filters?.sort === 'newest' ? desc(products.createdAt) : products.name;
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+    
+    const productList = await db.select().from(products).where(whereClause).orderBy(orderByClause).limit(limit).offset(offset);
+    const [totalResult] = await db.select({ count: count() }).from(products).where(whereClause);
+    
+    const total = totalResult?.count || 0;
+    const totalPages = Math.ceil(total / limit);
+    
+    return { products: productList, total, page, totalPages };
+  }
+
+  async getAllProducts(filters?: { categoryId?: number; search?: string; page?: number; limit?: number; sort?: string }): Promise<{ products: Product[]; total: number; page: number; totalPages: number }> {
     const page = filters?.page || 1;
     const limit = filters?.limit || 50;
     const offset = (page - 1) * limit;
@@ -757,8 +801,15 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Orders
-  async getOrders(userId?: string): Promise<Order[]> {
+  // Orders - Multi-tenant
+  async getOrders(companyId: string, userId?: string): Promise<Order[]> {
+    if (userId) {
+      return db.select().from(orders).where(and(eq(orders.companyId, companyId), eq(orders.userId, userId))).orderBy(desc(orders.createdAt));
+    }
+    return db.select().from(orders).where(eq(orders.companyId, companyId)).orderBy(desc(orders.createdAt));
+  }
+
+  async getAllOrders(userId?: string): Promise<Order[]> {
     if (userId) {
       return db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
     }
@@ -922,8 +973,12 @@ export class DatabaseStorage implements IStorage {
     return item;
   }
 
-  // Price Tables
-  async getPriceTables(): Promise<PriceTable[]> {
+  // Price Tables - Multi-tenant
+  async getPriceTables(companyId: string): Promise<PriceTable[]> {
+    return db.select().from(priceTables).where(eq(priceTables.companyId, companyId)).orderBy(priceTables.name);
+  }
+
+  async getAllPriceTables(): Promise<PriceTable[]> {
     return db.select().from(priceTables).orderBy(priceTables.name);
   }
 
@@ -947,8 +1002,12 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Customer Prices
-  async getCustomerPrices(userId: string): Promise<CustomerPrice[]> {
+  // Customer Prices - Multi-tenant
+  async getCustomerPrices(companyId: string, userId: string): Promise<CustomerPrice[]> {
+    return db.select().from(customerPrices).where(and(eq(customerPrices.companyId, companyId), eq(customerPrices.userId, userId)));
+  }
+
+  async getAllCustomerPrices(userId: string): Promise<CustomerPrice[]> {
     return db.select().from(customerPrices).where(eq(customerPrices.userId, userId));
   }
 
@@ -973,8 +1032,12 @@ export class DatabaseStorage implements IStorage {
     return true;
   }
 
-  // Coupons
-  async getCoupons(): Promise<Coupon[]> {
+  // Coupons - Multi-tenant
+  async getCoupons(companyId: string): Promise<Coupon[]> {
+    return db.select().from(coupons).where(eq(coupons.companyId, companyId)).orderBy(desc(coupons.createdAt));
+  }
+
+  async getAllCoupons(): Promise<Coupon[]> {
     return db.select().from(coupons).orderBy(desc(coupons.createdAt));
   }
 
@@ -983,8 +1046,8 @@ export class DatabaseStorage implements IStorage {
     return coupon;
   }
 
-  async getCouponByCode(code: string): Promise<Coupon | undefined> {
-    const [coupon] = await db.select().from(coupons).where(eq(coupons.code, code.toUpperCase()));
+  async getCouponByCode(companyId: string, code: string): Promise<Coupon | undefined> {
+    const [coupon] = await db.select().from(coupons).where(and(eq(coupons.companyId, companyId), eq(coupons.code, code.toUpperCase())));
     return coupon;
   }
 
@@ -2625,8 +2688,23 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  // ========== AGENDA EVENTS ==========
-  async getAgendaEvents(filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]> {
+  // ========== AGENDA EVENTS - Multi-tenant ==========
+  async getAgendaEvents(companyId: string, filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]> {
+    const conditions = [eq(agendaEvents.companyId, companyId)];
+    
+    if (filters?.startDate) {
+      conditions.push(sql`${agendaEvents.date} >= ${filters.startDate}`);
+    }
+    if (filters?.endDate) {
+      conditions.push(sql`${agendaEvents.date} <= ${filters.endDate}`);
+    }
+    
+    return db.select().from(agendaEvents)
+      .where(and(...conditions))
+      .orderBy(agendaEvents.date);
+  }
+
+  async getAllAgendaEvents(filters?: { startDate?: Date; endDate?: Date }): Promise<AgendaEvent[]> {
     const conditions = [];
     
     if (filters?.startDate) {
@@ -2665,30 +2743,39 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // ========== SITE SETTINGS ==========
-  async getSiteSetting(key: string): Promise<SiteSetting | undefined> {
-    const [setting] = await db.select().from(siteSettings).where(eq(siteSettings.key, key));
+  // ========== SITE SETTINGS - Multi-tenant ==========
+  async getSiteSetting(companyId: string, key: string): Promise<SiteSetting | undefined> {
+    const [setting] = await db.select().from(siteSettings).where(and(eq(siteSettings.companyId, companyId), eq(siteSettings.key, key)));
     return setting;
   }
 
-  async setSiteSetting(key: string, value: string): Promise<SiteSetting> {
-    const existing = await this.getSiteSetting(key);
+  async setSiteSetting(companyId: string, key: string, value: string): Promise<SiteSetting> {
+    const existing = await this.getSiteSetting(companyId, key);
     if (existing) {
       const [updated] = await db.update(siteSettings)
         .set({ value, updatedAt: new Date() })
-        .where(eq(siteSettings.key, key))
+        .where(and(eq(siteSettings.companyId, companyId), eq(siteSettings.key, key)))
         .returning();
       return updated;
     } else {
       const [created] = await db.insert(siteSettings)
-        .values({ key, value })
+        .values({ companyId, key, value })
         .returning();
       return created;
     }
   }
 
-  // ========== CATALOG BANNERS ==========
-  async getCatalogBanners(position?: string): Promise<CatalogBanner[]> {
+  // ========== CATALOG BANNERS - Multi-tenant ==========
+  async getCatalogBanners(companyId: string, position?: string): Promise<CatalogBanner[]> {
+    if (position) {
+      return db.select().from(catalogBanners)
+        .where(and(eq(catalogBanners.companyId, companyId), eq(catalogBanners.position, position)))
+        .orderBy(catalogBanners.order);
+    }
+    return db.select().from(catalogBanners).where(eq(catalogBanners.companyId, companyId)).orderBy(catalogBanners.order);
+  }
+
+  async getAllCatalogBanners(position?: string): Promise<CatalogBanner[]> {
     if (position) {
       return db.select().from(catalogBanners)
         .where(eq(catalogBanners.position, position))
@@ -2720,8 +2807,12 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // ========== CATALOG SLIDES ==========
-  async getCatalogSlides(): Promise<CatalogSlide[]> {
+  // ========== CATALOG SLIDES - Multi-tenant ==========
+  async getCatalogSlides(companyId: string): Promise<CatalogSlide[]> {
+    return db.select().from(catalogSlides).where(eq(catalogSlides.companyId, companyId)).orderBy(catalogSlides.order);
+  }
+
+  async getAllCatalogSlides(): Promise<CatalogSlide[]> {
     return db.select().from(catalogSlides).orderBy(catalogSlides.order);
   }
 
@@ -2748,23 +2839,23 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  // ========== CATALOG CONFIG ==========
-  async getCatalogConfig(key: string): Promise<CatalogConfig | undefined> {
-    const [config] = await db.select().from(catalogConfig).where(eq(catalogConfig.key, key));
+  // ========== CATALOG CONFIG - Multi-tenant ==========
+  async getCatalogConfig(companyId: string, key: string): Promise<CatalogConfig | undefined> {
+    const [config] = await db.select().from(catalogConfig).where(and(eq(catalogConfig.companyId, companyId), eq(catalogConfig.key, key)));
     return config;
   }
 
-  async setCatalogConfig(key: string, value: string): Promise<CatalogConfig> {
-    const existing = await this.getCatalogConfig(key);
+  async setCatalogConfig(companyId: string, key: string, value: string): Promise<CatalogConfig> {
+    const existing = await this.getCatalogConfig(companyId, key);
     if (existing) {
       const [updated] = await db.update(catalogConfig)
         .set({ value, updatedAt: new Date() })
-        .where(eq(catalogConfig.key, key))
+        .where(and(eq(catalogConfig.companyId, companyId), eq(catalogConfig.key, key)))
         .returning();
       return updated;
     } else {
       const [created] = await db.insert(catalogConfig)
-        .values({ key, value })
+        .values({ companyId, key, value })
         .returning();
       return created;
     }

@@ -15,6 +15,7 @@ import {
   orderItems,
   orders,
   products,
+  userCompanies,
 } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
 
@@ -151,6 +152,36 @@ export async function registerRoutes(
       }
       next();
     });
+  }
+
+  async function getActiveCompanyId(req: any): Promise<string | null> {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return null;
+
+    if (req.session?.activeCompanyId) {
+      return req.session.activeCompanyId;
+    }
+
+    const [userCompany] = await db
+      .select()
+      .from(userCompanies)
+      .where(eq(userCompanies.userId, userId))
+      .limit(1);
+
+    if (userCompany) {
+      if (req.session) {
+        req.session.activeCompanyId = userCompany.companyId;
+      }
+      return userCompany.companyId;
+    }
+
+    return null;
+  }
+
+  async function isSuperAdminReq(req: any): Promise<boolean> {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return false;
+    return checkIsSuperAdmin(userId);
   }
 
   async function isApproved(req: any, res: any, next: any) {
@@ -382,10 +413,60 @@ export async function registerRoutes(
     }
   });
 
-  // ========== CATEGORIES ==========
-  app.get("/api/categories", isAuthenticated, isApproved, async (req, res) => {
+  // ========== USER COMPANIES (Multi-tenant context) ==========
+  // Returns companies the authenticated user belongs to
+  app.get("/api/user/companies", isAuthenticated, async (req: any, res) => {
     try {
-      const categories = await storage.getCategories();
+      const userId = req.user.claims.sub;
+      const isB2bUser = req.user.isB2bUser;
+      
+      // Check if user is SUPER_ADMIN - they can access all companies
+      const isSuperAdmin = await checkIsSuperAdmin(userId);
+      
+      if (isSuperAdmin) {
+        // SUPER_ADMIN can see all companies
+        const allCompanies = await companiesService.getAllCompanies();
+        return res.json(allCompanies);
+      }
+      
+      // For B2B users, get companies they belong to
+      if (isB2bUser) {
+        const userCompanies = await companiesService.getCompaniesByUser(userId);
+        return res.json(userCompanies);
+      }
+      
+      // For legacy users, return empty (they don't use multi-tenant)
+      return res.json([]);
+    } catch (error) {
+      console.error("Error fetching user companies:", error);
+      res.status(500).json({ message: "Erro ao buscar empresas do usuário" });
+    }
+  });
+
+  // Get all companies (for SUPER_ADMIN only)
+  app.get("/api/companies", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const allCompanies = await companiesService.getAllCompanies();
+      res.json(allCompanies);
+    } catch (error) {
+      console.error("Error fetching all companies:", error);
+      res.status(500).json({ message: "Erro ao buscar empresas" });
+    }
+  });
+
+  // ========== CATEGORIES ==========
+  app.get("/api/categories", isAuthenticated, isApproved, async (req: any, res) => {
+    try {
+      const companyId = await getActiveCompanyId(req);
+      const isSuperAdmin = await isSuperAdminReq(req);
+      
+      if (!companyId && !isSuperAdmin) {
+        return res.json([]);
+      }
+      
+      const categories = (companyId && !isSuperAdmin)
+        ? await storage.getCategories(companyId)
+        : await storage.getAllCategories();
       res.json(categories);
     } catch (error) {
       console.error("Error fetching categories:", error);
@@ -477,7 +558,7 @@ export async function registerRoutes(
       const page = req.query.page ? parseInt(req.query.page as string) : 1;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 50;
       const sort = req.query.sort as string | undefined;
-      const result = await storage.getProducts({
+      const result = await storage.getAllProducts({
         categoryId,
         search,
         page,
@@ -486,7 +567,7 @@ export async function registerRoutes(
       });
 
       // Get categories hidden from varejo
-      const allCategories = await storage.getCategories();
+      const allCategories = await storage.getAllCategories();
       const hiddenCategoryIds = new Set(
         allCategories.filter((c) => c.hideFromVarejo).map((c) => c.id),
       );
@@ -515,7 +596,7 @@ export async function registerRoutes(
 
   app.get("/api/public/categories", async (req, res) => {
     try {
-      const categories = await storage.getCategories();
+      const categories = await storage.getAllCategories();
       // Filter out categories hidden from varejo
       const publicCategories = categories.filter((c) => !c.hideFromVarejo);
       res.json(publicCategories);
@@ -677,12 +758,16 @@ export async function registerRoutes(
         const limit = req.query.limit
           ? parseInt(req.query.limit as string)
           : 50;
-        const result = await storage.getProducts({
-          categoryId,
-          search,
-          page,
-          limit,
-        });
+        const companyId = await getActiveCompanyId(req);
+        const isSuperAdmin = await isSuperAdminReq(req);
+        
+        if (!companyId && !isSuperAdmin) {
+          return res.json({ products: [], total: 0, page: 1, totalPages: 0 });
+        }
+        
+        const result = (companyId && !isSuperAdmin)
+          ? await storage.getProducts(companyId, { categoryId, search, page, limit })
+          : await storage.getAllProducts({ categoryId, search, page, limit });
 
         // Get user to check customer type
         const userId = req.user?.claims?.sub;
@@ -813,14 +898,24 @@ export async function registerRoutes(
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      const companyId = await getActiveCompanyId(req);
+      const isSuperAdmin = await isSuperAdminReq(req);
+
+      if (!companyId && !isSuperAdmin) {
+        return res.json([]);
+      }
 
       let ordersData;
       // Customers can only see their own orders
       if (user?.role === "customer") {
-        ordersData = await storage.getOrders(userId);
+        ordersData = (companyId && !isSuperAdmin)
+          ? await storage.getOrders(companyId, userId)
+          : await storage.getAllOrders(userId);
       } else {
         // Admin and sales can see all orders
-        ordersData = await storage.getOrders();
+        ordersData = (companyId && !isSuperAdmin)
+          ? await storage.getOrders(companyId)
+          : await storage.getAllOrders();
       }
 
       // Fetch customer info and item count for each order
@@ -1764,7 +1859,10 @@ export async function registerRoutes(
         return res.status(401).json({ message: "User not found" });
       }
 
-      const productsResult = await storage.getProducts();
+      const companyId = await getActiveCompanyId(req);
+      const productsResult = companyId 
+        ? await storage.getProducts(companyId)
+        : await storage.getAllProducts();
       const allProducts = productsResult.products;
       const brandsSet = new Set<string>();
       allProducts.forEach((p: { brand: string | null }) => {
@@ -1793,7 +1891,7 @@ export async function registerRoutes(
     isAdmin,
     async (req: any, res) => {
       try {
-        const productsResult = await storage.getProducts();
+        const productsResult = await storage.getAllProducts();
         const allProducts = productsResult.products;
         const brandsSet = new Set<string>();
         allProducts.forEach((p: { brand: string | null }) => {
@@ -1914,7 +2012,16 @@ export async function registerRoutes(
         const endDate = req.query.endDate
           ? new Date(req.query.endDate)
           : undefined;
-        const events = await storage.getAgendaEvents({ startDate, endDate });
+        const companyId = await getActiveCompanyId(req);
+        const isSuperAdmin = await isSuperAdminReq(req);
+        
+        if (!companyId && !isSuperAdmin) {
+          return res.json([]);
+        }
+        
+        const events = (companyId && !isSuperAdmin)
+          ? await storage.getAgendaEvents(companyId, { startDate, endDate })
+          : await storage.getAllAgendaEvents({ startDate, endDate });
         res.json(events);
       } catch (error) {
         console.error("Error fetching agenda events:", error);
@@ -2477,20 +2584,22 @@ export async function registerRoutes(
   );
 
   // ========== SITE SETTINGS ==========
+  const DEFAULT_COMPANY_ID = "default";
 
   // Public endpoint for specific settings (for catalog)
   app.get("/api/public/settings/:key", async (req, res) => {
     try {
-      const setting = await storage.getSiteSetting(req.params.key);
+      const setting = await storage.getSiteSetting(DEFAULT_COMPANY_ID, req.params.key);
       res.json({ key: req.params.key, value: setting?.value || null });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch setting" });
     }
   });
 
-  app.get("/api/settings/:key", async (req, res) => {
+  app.get("/api/settings/:key", async (req: any, res) => {
     try {
-      const setting = await storage.getSiteSetting(req.params.key);
+      const companyId = await getActiveCompanyId(req) || DEFAULT_COMPANY_ID;
+      const setting = await storage.getSiteSetting(companyId, req.params.key);
       res.json({ key: req.params.key, value: setting?.value || null });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch setting" });
@@ -2510,7 +2619,8 @@ export async function registerRoutes(
           req.body.value,
         );
         const { value } = req.body;
-        const setting = await storage.setSiteSetting(req.params.key, value);
+        const companyId = await getActiveCompanyId(req) || DEFAULT_COMPANY_ID;
+        const setting = await storage.setSiteSetting(companyId, req.params.key, value);
         console.log("[SETTINGS] Saved:", setting);
         res.json(setting);
       } catch (error) {
@@ -2521,10 +2631,19 @@ export async function registerRoutes(
   );
 
   // ========== CATALOG BANNERS ==========
-  app.get("/api/catalog/banners", async (req, res) => {
+  app.get("/api/catalog/banners", async (req: any, res) => {
     try {
       const position = req.query.position as string | undefined;
-      const banners = await storage.getCatalogBanners(position);
+      const companyId = await getActiveCompanyId(req);
+      const isSuperAdmin = await isSuperAdminReq(req);
+      
+      if (!companyId && !isSuperAdmin) {
+        return res.json([]);
+      }
+      
+      const banners = (companyId && !isSuperAdmin)
+        ? await storage.getCatalogBanners(companyId, position)
+        : await storage.getAllCatalogBanners(position);
       res.json(banners);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch banners" });
@@ -2599,9 +2718,18 @@ export async function registerRoutes(
   );
 
   // ========== CATALOG SLIDES ==========
-  app.get("/api/catalog/slides", async (req, res) => {
+  app.get("/api/catalog/slides", async (req: any, res) => {
     try {
-      const slides = await storage.getCatalogSlides();
+      const companyId = await getActiveCompanyId(req);
+      const isSuperAdmin = await isSuperAdminReq(req);
+      
+      if (!companyId && !isSuperAdmin) {
+        return res.json([]);
+      }
+      
+      const slides = (companyId && !isSuperAdmin)
+        ? await storage.getCatalogSlides(companyId)
+        : await storage.getAllCatalogSlides();
       res.json(slides);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch slides" });
@@ -2676,9 +2804,10 @@ export async function registerRoutes(
   );
 
   // ========== CATALOG CONFIG ==========
-  app.get("/api/catalog/config/:key", async (req, res) => {
+  app.get("/api/catalog/config/:key", async (req: any, res) => {
     try {
-      const config = await storage.getCatalogConfig(req.params.key);
+      const companyId = await getActiveCompanyId(req) || DEFAULT_COMPANY_ID;
+      const config = await storage.getCatalogConfig(companyId, req.params.key);
       res.json({ key: req.params.key, value: config?.value || null });
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch config" });
@@ -2692,7 +2821,8 @@ export async function registerRoutes(
     async (req: any, res) => {
       try {
         const { value } = req.body;
-        const config = await storage.setCatalogConfig(req.params.key, value);
+        const companyId = await getActiveCompanyId(req) || DEFAULT_COMPANY_ID;
+        const config = await storage.setCatalogConfig(companyId, req.params.key, value);
         res.json(config);
       } catch (error) {
         res.status(500).json({ message: "Failed to save config" });
@@ -2707,7 +2837,18 @@ export async function registerRoutes(
     isAdminOrSales,
     async (req: any, res) => {
       try {
-        const orders = await storage.getOrders();
+        const companyId = await getActiveCompanyId(req);
+        const isSuperAdmin = await isSuperAdminReq(req);
+        
+        if (!companyId && !isSuperAdmin) {
+          res.setHeader("Content-Type", "text/csv");
+          res.setHeader("Content-Disposition", 'attachment; filename="orders.csv"');
+          return res.send("Order Number,User ID,Status,Total,Notes,Created At\n");
+        }
+        
+        const orders = (companyId && !isSuperAdmin)
+          ? await storage.getOrders(companyId)
+          : await storage.getAllOrders();
 
         // Build CSV content
         const headers = [
@@ -3022,9 +3163,12 @@ export async function registerRoutes(
   );
 
   // ========== COUPONS ==========
-  app.get("/api/coupons", isAuthenticated, isAdmin, async (req, res) => {
+  app.get("/api/coupons", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
-      const couponsList = await storage.getCoupons();
+      const companyId = await getActiveCompanyId(req);
+      const couponsList = companyId
+        ? await storage.getCoupons(companyId)
+        : await storage.getAllCoupons();
       res.json(couponsList);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch coupons" });
@@ -3081,10 +3225,11 @@ export async function registerRoutes(
     "/api/coupons/validate",
     isAuthenticated,
     isApproved,
-    async (req, res) => {
+    async (req: any, res) => {
       try {
         const { code, orderTotal } = req.body;
-        const coupon = await storage.getCouponByCode(code);
+        const companyId = await getActiveCompanyId(req) || DEFAULT_COMPANY_ID;
+        const coupon = await storage.getCouponByCode(companyId, code);
 
         if (!coupon) {
           return res
@@ -3324,7 +3469,7 @@ export async function registerRoutes(
         const blingIdToLocalId: Record<number, number> = {};
 
         // Load existing categories
-        const existingCategories = await storage.getCategories();
+        const existingCategories = await storage.getAllCategories();
         existingCategories.forEach((c) => {
           if (c.blingId) {
             blingIdToLocalId[c.blingId] = c.id;
@@ -3460,7 +3605,7 @@ export async function registerRoutes(
         }
 
         // Load category mappings
-        const existingCategories = await storage.getCategories();
+        const existingCategories = await storage.getAllCategories();
         const blingIdToCategoryId: Record<number, number> = {};
         const categoryMap: Record<string, number> = {};
         existingCategories.forEach((c) => {
@@ -4382,11 +4527,20 @@ export async function registerRoutes(
     },
   );
 
-  // ========== CATALOG BANNERS ==========
-  app.get("/api/catalog/banners", async (req, res) => {
+  // ========== CATALOG BANNERS (v2) ==========
+  app.get("/api/v2/catalog/banners", async (req: any, res) => {
     try {
       const position = req.query.position as string | undefined;
-      const banners = await storage.getCatalogBanners(position);
+      const companyId = await getActiveCompanyId(req);
+      const isSuperAdmin = await isSuperAdminReq(req);
+      
+      if (!companyId && !isSuperAdmin) {
+        return res.json([]);
+      }
+      
+      const banners = (companyId && !isSuperAdmin)
+        ? await storage.getCatalogBanners(companyId, position)
+        : await storage.getAllCatalogBanners(position);
       res.json(banners);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch banners" });
@@ -4394,7 +4548,7 @@ export async function registerRoutes(
   });
 
   app.get(
-    "/api/catalog/banners/:id",
+    "/api/v2/catalog/banners/:id",
     isAuthenticated,
     isAdmin,
     async (req, res) => {
@@ -4411,7 +4565,7 @@ export async function registerRoutes(
   );
 
   app.post(
-    "/api/catalog/banners",
+    "/api/v2/catalog/banners",
     isAuthenticated,
     isAdmin,
     async (req, res) => {
@@ -4431,7 +4585,7 @@ export async function registerRoutes(
   );
 
   app.patch(
-    "/api/catalog/banners/:id",
+    "/api/v2/catalog/banners/:id",
     isAuthenticated,
     isAdmin,
     async (req, res) => {
@@ -4451,7 +4605,7 @@ export async function registerRoutes(
   );
 
   app.delete(
-    "/api/catalog/banners/:id",
+    "/api/v2/catalog/banners/:id",
     isAuthenticated,
     isAdmin,
     async (req, res) => {
@@ -4464,10 +4618,19 @@ export async function registerRoutes(
     },
   );
 
-  // ========== CATALOG SLIDES ==========
-  app.get("/api/catalog/slides", async (req, res) => {
+  // ========== CATALOG SLIDES (v2) ==========
+  app.get("/api/v2/catalog/slides", async (req: any, res) => {
     try {
-      const slides = await storage.getCatalogSlides();
+      const companyId = await getActiveCompanyId(req);
+      const isSuperAdmin = await isSuperAdminReq(req);
+      
+      if (!companyId && !isSuperAdmin) {
+        return res.json([]);
+      }
+      
+      const slides = (companyId && !isSuperAdmin)
+        ? await storage.getCatalogSlides(companyId)
+        : await storage.getAllCatalogSlides();
       res.json(slides);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch slides" });
@@ -4475,7 +4638,7 @@ export async function registerRoutes(
   });
 
   app.get(
-    "/api/catalog/slides/:id",
+    "/api/v2/catalog/slides/:id",
     isAuthenticated,
     isAdmin,
     async (req, res) => {
@@ -4492,7 +4655,7 @@ export async function registerRoutes(
   );
 
   app.post(
-    "/api/catalog/slides",
+    "/api/v2/catalog/slides",
     isAuthenticated,
     isAdmin,
     async (req, res) => {
@@ -4512,7 +4675,7 @@ export async function registerRoutes(
   );
 
   app.patch(
-    "/api/catalog/slides/:id",
+    "/api/v2/catalog/slides/:id",
     isAuthenticated,
     isAdmin,
     async (req, res) => {

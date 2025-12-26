@@ -81,7 +81,7 @@ export async function setupAuth(app: Express) {
   const config = await getOidcConfig();
   
   if (!config) {
-    console.log("Replit Auth not available (REPL_ID not set). OAuth routes will be disabled, but local auth will work.");
+    console.log("OIDC Auth not available (ISSUER_URL not set). OAuth routes will be disabled, but local auth will work.");
     
     passport.serializeUser((user: Express.User, cb) => cb(null, user));
     passport.deserializeUser((user: Express.User, cb) => cb(null, user));
@@ -155,7 +155,7 @@ export async function setupAuth(app: Express) {
     req.logout(() => {
       res.redirect(
         client.buildEndSessionUrl(config, {
-          client_id: process.env.REPLIT_DOMAINS?.split(",")[0] || "",
+          client_id: process.env.CLIENT_ID || "",
           post_logout_redirect_uri: `${req.protocol}://${req.hostname}`,
         }).href
       );

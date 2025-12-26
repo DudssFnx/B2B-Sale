@@ -7,12 +7,20 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { CartProvider, useCart } from "@/contexts/CartContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { CompanyProvider, useCompany } from "@/contexts/CompanyContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AppSidebar } from "@/components/AppSidebar";
 import { CartDrawer } from "@/components/CartDrawer";
 import { AgeVerificationPopup } from "@/components/AgeVerificationPopup";
 import { Button } from "@/components/ui/button";
-import { ShoppingCart, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ShoppingCart, Loader2, Building2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import RegisterPage from "@/pages/register";
@@ -45,6 +53,45 @@ import SuppliersPage from "@/pages/suppliers";
 import PaymentsPage from "@/pages/payments";
 import StorePage from "@/pages/store";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+
+function CompanySelector() {
+  const { activeCompany, companies, hasMultipleCompanies, setActiveCompany, isLoading } = useCompany();
+
+  if (isLoading || !hasMultipleCompanies || companies.length === 0) {
+    return null;
+  }
+
+  return (
+    <Select
+      value={activeCompany?.id || ""}
+      onValueChange={(value) => {
+        const company = companies.find(c => c.id === value);
+        if (company) {
+          setActiveCompany(company);
+        }
+      }}
+    >
+      <SelectTrigger 
+        className="w-[200px]" 
+        data-testid="select-company"
+      >
+        <Building2 className="h-4 w-4 mr-2 shrink-0" />
+        <SelectValue placeholder="Selecionar empresa" />
+      </SelectTrigger>
+      <SelectContent>
+        {companies.map((company) => (
+          <SelectItem 
+            key={company.id} 
+            value={company.id}
+            data-testid={`select-company-${company.id}`}
+          >
+            {company.nomeFantasia || company.razaoSocial || company.cnpj}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
 
 function AuthenticatedApp() {
   const { user, logout, isAdmin, isSupplier, isSales, isApproved } = useAuth();
@@ -87,7 +134,10 @@ function AuthenticatedApp() {
         />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-4 p-3 border-b bg-background sticky top-0 z-50">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <div className="flex items-center gap-2">
+              <SidebarTrigger data-testid="button-sidebar-toggle" />
+              <CompanySelector />
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -165,9 +215,11 @@ function AppContent() {
   }
 
   return (
-    <CartProvider>
-      <AuthenticatedApp />
-    </CartProvider>
+    <CompanyProvider>
+      <CartProvider>
+        <AuthenticatedApp />
+      </CartProvider>
+    </CompanyProvider>
   );
 }
 
