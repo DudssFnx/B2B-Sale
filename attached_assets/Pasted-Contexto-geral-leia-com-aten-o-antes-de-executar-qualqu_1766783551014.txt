@@ -1,0 +1,247 @@
+Contexto geral (leia com atenção antes de executar qualquer mudança):
+Este projeto é um SaaS multi-tenant B2B.
+Ele não pode depender do ambiente do Replit para funcionar.
+Tudo precisa rodar de forma idêntica em:
+
+ambiente local
+
+Railway (Postgres)
+
+Vercel (deploy final)
+
+Nenhuma mudança deve quebrar funcionalidades existentes.
+
+🎯 OBJETIVO PRINCIPAL
+
+Finalizar a arquitetura multi-tenant e deixar o projeto 100% pronto para produção, com:
+
+isolamento total de dados por empresa (company_id)
+
+lojas públicas por slug (/loja/:slug)
+
+painel administrativo com contexto de empresa
+
+painel SUPER_ADMIN global
+
+zero dependência do Replit
+
+🧩 TAREFA 1 — ISOLAMENTO TOTAL POR company_id (CRÍTICO)
+O que precisa ser garantido:
+
+Todas as tabelas de negócio devem possuir company_id:
+
+products / b2b_products
+
+categories
+
+orders / b2b_orders
+
+order_items
+
+banners / catalog_banners / catalog_slides
+
+coupons
+
+price_tables
+
+site_settings / catalog_config
+
+qualquer outra tabela que represente dados da loja
+
+Nenhuma query pode:
+
+buscar
+
+criar
+
+atualizar
+
+deletar
+dados sem filtrar por company_id.
+
+Constraints:
+
+índices UNIQUE devem ser (company_id + campo) quando aplicável
+
+nunca mais UNIQUE global para dados de loja
+
+O backend deve exigir companyId explicitamente em:
+
+criação de produtos
+
+criação de categorias
+
+criação de pedidos
+
+criação de banners
+
+🧩 TAREFA 2 — CONTEXTO activeCompanyId NO PAINEL
+Implementar:
+
+Resolver activeCompanyId após login:
+
+via relação user_companies
+
+ou empresa padrão do usuário
+
+Criar um CompanyContext no frontend:
+
+expõe companyId, companyName, companySlug
+
+usado automaticamente em chamadas privadas
+
+Backend:
+
+APIs privadas NUNCA recebem slug
+
+sempre usam companyId vindo do contexto autenticado
+
+📌 Slug é somente para loja pública, nunca para painel.
+
+🧩 TAREFA 3 — LOJA PÚBLICA CONFIGURÁVEL PELO CLIENTE
+
+Manter a estrutura /loja/:slug, mas permitir customização sem código.
+
+Implementar:
+
+Tabela de configuração por empresa (catalog_config / site_settings)
+
+O cliente pode:
+
+ativar/desativar seções:
+
+banner principal
+
+lançamentos
+
+categorias
+
+destaques
+
+editar textos:
+
+título principal
+
+subtítulo
+
+mensagens promocionais
+
+Frontend da loja pública:
+
+renderiza apenas seções ativas
+
+layout pré-definido (não permitir quebrar UI)
+
+sem lógica hardcoded
+
+⚠️ Não criar editor visual complexo.
+Apenas configuração estruturada.
+
+🧩 TAREFA 4 — PAINEL SUPER_ADMIN (GLOBAL)
+
+Criar um painel exclusivo para administrador do sistema.
+
+Deve permitir:
+
+listar todas as empresas
+
+status da empresa (ativa / inativa)
+
+tipo (varejo / atacado)
+
+métricas básicas:
+
+pedidos
+
+faturamento
+
+produtos ativos
+
+acessar empresas em modo leitura (sem misturar contextos)
+
+📌 SUPER_ADMIN:
+
+não tem company_id fixo
+
+enxerga tudo
+
+não pode operar como cliente sem troca explícita de contexto
+
+🧩 TAREFA 5 — REMOÇÃO TOTAL DE DEPENDÊNCIAS DO REPLIT (OBRIGATÓRIO)
+
+Antes de finalizar:
+
+Remover:
+
+qualquer uso de:
+
+REPLIT_*
+
+plugins específicos do Replit
+
+lógica de filesystem dependente do Replit
+
+Garantir:
+
+.env padrão
+
+process.env no backend
+
+import.meta.env no frontend
+
+npm run build funcionando localmente
+
+📌 O projeto deve rodar idêntico em:
+
+npm run dev
+
+npm run build
+
+Vercel
+
+🧩 TAREFA 6 — VALIDAÇÃO FINAL (CHECKLIST)
+
+Antes de marcar como concluído:
+
+Criar 2 empresas
+
+Criar produtos e categorias diferentes
+
+Validar:
+
+/loja/empresa-a
+
+/loja/empresa-b
+
+Garantir:
+
+nenhum dado cruza empresas
+
+Build local:
+
+npm run build
+
+
+Nenhum warning crítico
+
+🚫 RESTRIÇÕES IMPORTANTES
+
+❌ Não quebrar funcionalidades existentes
+
+❌ Não mudar UX sem necessidade
+
+❌ Não acoplar painel à loja pública
+
+❌ Não usar slug em APIs privadas
+
+✅ RESULTADO ESPERADO
+
+Ao final:
+
+projeto SaaS multi-tenant sólido
+
+pronto para Vercel
+
+escalável para dezenas/centenas de empresas
+
+com você como SUPER_ADMIN central
