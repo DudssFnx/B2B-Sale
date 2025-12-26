@@ -1,0 +1,228 @@
+Objetivo geral
+Refatorar o sistema atual para funcionar como um SaaS multi-empresa real, com:
+
+lojas públicas por empresa (/loja/:slug)
+
+dados totalmente isolados por empresa (produtos, categorias, pedidos, banners)
+
+painel admin global (super admin)
+
+compatível com Vercel (frontend) e Railway (backend + banco)
+⚠️ Não depender de nenhuma feature exclusiva do Replit
+
+1️⃣ MULTI-EMPRESA (ISOLAMENTO DE DADOS)
+
+Refatorar todo o sistema para que nenhum dado de uma empresa apareça em outra.
+
+Ações obrigatórias:
+
+Usar a tabela companies como entidade central
+
+Garantir que TODAS as entidades abaixo tenham company_id (FK):
+
+products
+b2b_products
+categories
+catalog_slides
+catalog_banners
+orders
+b2b_orders
+coupons
+price_tables
+customer_prices
+site_settings
+
+
+Atualizar queries para SEMPRE filtrar por company_id
+
+Nunca usar dados globais por padrão
+
+2️⃣ SLUG DA LOJA (URL PÚBLICA)
+
+Adicionar suporte a lojas públicas por URL:
+
+/site.com/loja/:slug
+
+Backend:
+
+Adicionar coluna slug (UNIQUE, NOT NULL) na tabela companies
+
+Resolver empresa por slug
+
+Retornar:
+
+dados da empresa
+
+catálogo
+
+banners
+
+configurações visuais
+
+Frontend:
+
+Criar rota pública:
+
+/loja/:slug
+
+
+Carregar tudo baseado no slug
+
+Não exigir login para visualizar catálogo
+
+3️⃣ CATÁLOGO PERSONALIZÁVEL POR EMPRESA
+
+Cada empresa deve poder configurar sua própria vitrine, sem código.
+
+Usar as tabelas já existentes:
+
+catalog_config
+
+catalog_banners
+
+catalog_slides
+
+site_settings
+
+Funcionalidades esperadas no painel do cliente:
+
+Ativar/desativar seções:
+
+banner principal
+
+lançamentos
+
+categorias
+
+destaques
+
+Definir textos:
+
+headline
+
+subtítulo
+
+CTA
+
+Escolher imagens dos banners
+
+Ordem das seções
+
+⚠️ Usar layout pré-definido, apenas configurável (não permitir layout livre).
+
+4️⃣ LOGIN E CONTEXTO DE EMPRESA
+
+Usuário loga por email/senha
+
+Usuário pertence a UMA ou MAIS empresas (user_companies)
+
+Ao logar:
+
+definir activeCompanyId
+
+todo painel passa a operar nesse contexto
+
+Usuário não escolhe empresa por URL
+
+Loja pública não depende de login
+
+5️⃣ PAINEL ADMIN GLOBAL (SUPER ADMIN)
+
+Criar/garantir um painel exclusivo de administrador do sistema:
+
+Permissões:
+
+Ver todas as empresas (companies)
+
+Ver métricas por empresa:
+
+pedidos
+
+faturamento
+
+produtos ativos
+
+Ativar/desativar empresas
+
+Aprovar empresas (approval_status)
+
+Não misturar com painel do cliente
+
+6️⃣ COMPATIBILIDADE FORA DO REPLIT (CRÍTICO)
+
+Garantir que o projeto rode corretamente em:
+
+Frontend:
+
+Vercel
+
+Vite + React
+
+Variáveis via import.meta.env
+
+Backend:
+
+Railway
+
+Express
+
+Banco PostgreSQL (Railway)
+
+Nada de:
+
+plugins Replit
+
+paths mágicos
+
+dependências implícitas do Replit
+
+7️⃣ VALIDAÇÕES IMPORTANTES
+
+Nenhuma empresa vê dados de outra
+
+/loja/:slug funciona sem login
+
+Login não quebra catálogo público
+
+Build funciona localmente (npm run build)
+
+Deploy funciona no Vercel sem ajustes manuais
+
+8️⃣ NÃO FAZER
+
+❌ Não remover tabelas existentes
+❌ Não mudar nomes de tabelas sem necessidade
+❌ Não quebrar autenticação atual
+❌ Não acoplar lógica ao ambiente Replit
+
+✅ RESULTADO ESPERADO
+
+Sistema SaaS multi-empresa real
+
+Cada cliente com sua própria loja pública
+
+Admin global com visão completa
+
+Mesmo comportamento:
+
+local
+
+Replit
+
+Vercel
+
+Railway
+
+🧪 Após finalizar, o sistema deve permitir:
+site.com/loja/lojamadrugadao
+site.com/loja/distribuidora-x
+site.com/loja/cliente123
+
+
+Cada um com:
+
+produtos próprios
+
+layout próprio
+
+pedidos próprios
