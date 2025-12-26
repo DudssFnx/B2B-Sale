@@ -1,0 +1,152 @@
+Refatore o projeto para funcionar como um sistema multi-loja (multi-tenant), garantindo que ele funcione corretamente fora do Replit (ambiente local e Vercel), sem dependências específicas do Replit, mantendo o banco de dados já configurado no Railway e sem quebrar funcionalidades existentes.
+
+🌍 COMPATIBILIDADE (CRÍTICO)
+
+O projeto não pode depender de recursos exclusivos do Replit
+
+Remover qualquer:
+
+plugin do Replit
+
+path absoluto do Replit
+
+runtime específico
+
+Garantir funcionamento idêntico em:
+
+ambiente local
+
+Replit
+
+Vercel
+
+Usar apenas:
+
+Vite padrão
+
+Node.js padrão
+
+variáveis de ambiente (process.env)
+
+🔗 CATÁLOGO PÚBLICO POR LOJA (SEM LOGIN)
+
+Implementar rotas públicas no formato:
+
+/loja/:slug
+
+
+Cada cliente (loja) possui um slug único
+
+Essa página:
+
+não exige login
+
+carrega dados da loja pelo slug
+
+exibe apenas produtos daquela loja
+
+Criar endpoint:
+
+GET /api/public/store/:slug
+
+🎨 LAYOUT CONFIGURÁVEL POR LOJA (ANTES DO LOGIN)
+
+Criar uma estrutura de configuração da loja, controlada pelo painel do cliente, sem permitir customização de código.
+
+Requisitos:
+
+Layout base único (não criar layouts diferentes por loja)
+
+Seções controladas por configuração:
+
+banner principal (imagem + título + subtítulo)
+
+destaques
+
+categorias
+
+produtos em destaque
+
+botão WhatsApp
+
+Cada seção deve poder ser:
+
+ativada/desativada
+
+ter textos editáveis
+
+ter imagens configuráveis
+
+Exemplo de controle:
+
+Checkbox: “Exibir banner”
+
+Campo texto: “Título do banner”
+
+Upload/URL: “Imagem do banner”
+
+Essas configurações devem refletir automaticamente no catálogo público /loja/:slug.
+
+🧑‍💼 PAINEL DO CLIENTE (ADMIN DA LOJA)
+
+Cliente logado administra apenas sua loja
+
+Pode:
+
+editar produtos
+
+ver pedidos
+
+editar configurações visuais da loja
+
+Não pode acessar dados de outras lojas
+
+👑 PAINEL ADMIN MASTER (GLOBAL)
+
+Criar papel ADMIN_MASTER com acesso global:
+
+Visualizar todas as lojas
+
+Ver métricas por loja:
+
+faturamento
+
+pedidos
+
+ticket médio
+
+Ver métricas gerais do sistema
+
+Nenhuma loja específica associada ao admin master
+
+🗄️ BANCO DE DADOS (IMPORTANTE)
+
+Não alterar o banco do Railway sem necessidade
+
+Reutilizar tabelas existentes sempre que possível
+
+Caso necessário, adicionar:
+
+tabela stores
+
+tabela ou campo store_settings
+
+Evitar migrações destrutivas
+
+🎯 OBJETIVO FINAL
+
+Sistema SaaS multi-loja
+
+Cada cliente com:
+
+catálogo público
+
+painel administrativo
+
+Você com:
+
+painel global
+
+visão estratégica do negócio
+
+Código limpo, portável e pronto para produção
