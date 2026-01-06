@@ -70,3 +70,23 @@ export {
   feeTypeEnum,
   integrationStatusEnum
 } from "./payments.schema";
+
+export {
+  plans,
+  subscriptions,
+  usageMetrics,
+  insertPlanSchema,
+  insertSubscriptionSchema,
+  insertUsageMetricSchema,
+  planLimitsSchema,
+  planStatusEnum,
+  subscriptionStatusEnum,
+  billingCycleEnum,
+  type Plan,
+  type InsertPlan,
+  type Subscription,
+  type InsertSubscription,
+  type UsageMetric,
+  type InsertUsageMetric,
+  type PlanLimits
+} from "./plans.schema";
